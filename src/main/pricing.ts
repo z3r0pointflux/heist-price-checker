@@ -133,6 +133,7 @@ export async function fetchPriceData(): Promise<void> {
   uniqueNames = uniques;
   lastFetchTime = Date.now();
   baseTypeFuse = null; // Reset cached index
+  currencyFuse = null;
 
   // Build Fuse.js index
   fuseIndex = new Fuse(allItems, {
@@ -193,6 +194,26 @@ export function lookupPriceRange(name: string, itemType?: string): PriceRange | 
 }
 
 let baseTypeFuse: Fuse<PriceResult> | null = null;
+let currencyFuse: Fuse<PriceResult> | null = null;
+
+export function lookupCurrency(searchTerm: string): { item: PriceResult; score: number } | null {
+  if (allItems.length === 0) return null;
+
+  if (!currencyFuse) {
+    const currencyItems = allItems.filter(i => i.itemType === 'Currency' || i.itemType === 'Fragment');
+    currencyFuse = new Fuse(currencyItems, {
+      keys: ['name'],
+      threshold: 0.4,
+      distance: 100,
+      includeScore: true,
+    });
+  }
+
+  const results = currencyFuse.search(searchTerm);
+  if (results.length === 0) return null;
+
+  return { item: results[0].item, score: results[0].score ?? 1 };
+}
 
 export function lookupBaseType(searchTerm: string): { item: PriceResult; score: number } | null {
   if (allItems.length === 0) return null;

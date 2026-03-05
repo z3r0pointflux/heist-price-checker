@@ -1,4 +1,4 @@
-import { getUniqueNames, lookupBaseType } from './pricing';
+import { getUniqueNames, lookupBaseType, lookupCurrency } from './pricing';
 import Fuse from 'fuse.js';
 
 export interface ItemInfo {
@@ -49,8 +49,34 @@ export function classifyItem(lines: string[]): ItemInfo {
     }
   }
 
+  // Try each line as a currency lookup
+  let bestCurrency: { line: string; match: string; score: number } | null = null;
+  for (const line of lines) {
+    if (line.replace(/[^A-Za-z]/g, '').length < 4) continue;
+    const result = lookupCurrency(line);
+    if (result) {
+      if (!bestCurrency || result.score < bestCurrency.score) {
+        bestCurrency = { line, match: result.item.name, score: result.score };
+      }
+    }
+  }
+
   console.log(`[itemDetect] Best unique match: ${bestUnique ? `"${bestUnique.match}" (score: ${bestUnique.score.toFixed(3)}) from line "${bestUnique.line}"` : 'none'}`);
   console.log(`[itemDetect] Best base match: ${bestBase ? `"${bestBase.match}" (score: ${bestBase.score.toFixed(3)}) from line "${bestBase.line}"` : 'none'}`);
+  console.log(`[itemDetect] Best currency match: ${bestCurrency ? `"${bestCurrency.match}" (score: ${bestCurrency.score.toFixed(3)}) from line "${bestCurrency.line}"` : 'none'}`);
+
+  // Currency match — check before uniques/bases since currency names are distinctive
+  // and description text (picked up by OCR) would match base types falsely
+  if (bestCurrency && bestCurrency.score < 0.35) {
+    // Only use currency if it's a better match than base type, or no good base match
+    if (!bestBase || bestCurrency.score <= bestBase.score) {
+      return {
+        type: 'currency',
+        searchTerm: bestCurrency.match,
+        displayName: bestCurrency.match,
+      };
+    }
+  }
 
   // If we have both a unique and base match from DIFFERENT lines,
   // the item is likely unique (unique name + base type on separate lines)

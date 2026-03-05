@@ -62,6 +62,13 @@ export async function recognizeText(
     // Filter noise: curio display variants
     .filter(line => !/disp.?lay/i.test(line))
     .filter(line => !/cur.{0,4}o/i.test(line) || line.length > 20)
+    // Filter item description text (currency/flask descriptions)
+    .filter(line => !/stack\s*size/i.test(line))
+    .filter(line => !/removes?\s+(all\s+)?mod/i.test(line))
+    .filter(line => !/right.click/i.test(line))
+    .filter(line => !/upgrades?\s+a\s/i.test(line))
+    .filter(line => !/reforges?\s/i.test(line))
+    .filter(line => !/modifiers?\s+(from|to|on)\s/i.test(line))
     // Filter lines that are mostly non-alpha (border artifacts)
     .filter(line => {
       const alphaCount = (line.match(/[A-Za-z]/g) || []).length;

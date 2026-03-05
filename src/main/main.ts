@@ -159,8 +159,14 @@ async function handleHotkeyPress(): Promise<void> {
     await ensureFreshCache();
 
     // Look up price range for the item
-    const itemTypeFilter = itemInfo.type === 'rare' ? 'BaseType' : undefined;
-    const range = lookupPriceRange(itemInfo.searchTerm, itemTypeFilter);
+    const itemTypeFilter = itemInfo.type === 'rare' ? 'BaseType'
+      : itemInfo.type === 'currency' ? 'Currency'
+      : undefined;
+    let range = lookupPriceRange(itemInfo.searchTerm, itemTypeFilter);
+    // Currency might also be in Fragment category
+    if (!range && itemInfo.type === 'currency') {
+      range = lookupPriceRange(itemInfo.searchTerm, 'Fragment');
+    }
     console.log(`[main] lookupPriceRange("${itemInfo.searchTerm}", ${itemTypeFilter}) => ${range ? `${range.name}: ${range.minChaos}-${range.maxChaos}c (${range.entries.length} variants)` : 'null'}`);
 
     // 6. Show overlay

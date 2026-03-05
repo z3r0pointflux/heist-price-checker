@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src https:; style-src 'self';">
+  <link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+  <div id="overlay" onclick="window.heistAPI.dismissOverlay()">
+    <div id="item-name"></div>
+    <div id="base-name"></div>
+    <div id="price-section">
+      <div id="chaos-price"></div>
+      <div id="divine-price"></div>
+      <div id="listings"></div>
+    </div>
+    <div id="attribution">poe.ninja</div>
+    <div id="no-price" style="display:none;">No pricing data found</div>
+  </div>
+  <script src="overlay.js"></script>
+</body>
+</html>

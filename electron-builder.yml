@@ -1,0 +1,18 @@
+appId: com.heistchecker.app
+productName: HeistChecker
+directories:
+  output: out
+files:
+  - dist/**/*
+  - assets/**/*
+  - "!node_modules/**/*.ts"
+win:
+  target: nsis
+  icon: assets/tray-icon.png
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+extraResources:
+  - from: assets/
+    to: assets/

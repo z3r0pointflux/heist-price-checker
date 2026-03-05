@@ -1,0 +1,24 @@
+{
+  "name": "z3r0s-heist-price-checker",
+  "version": "1.0.0",
+  "description": "z3r0's Heist Price Checker - Path of Exile Heist curio display price checker using poe.ninja",
+  "productName": "z3r0's Heist Price Checker",
+  "main": "dist/main/main.js",
+  "scripts": {
+    "start": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron .",
+    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron-builder",
+    "compile": "tsc"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "fuse.js": "^7.0.0",
+    "sharp": "^0.33.2",
+    "tesseract.js": "^5.0.4"
+  },
+  "devDependencies": {
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1",
+    "typescript": "^5.3.3"
+  }
+}

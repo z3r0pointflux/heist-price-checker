@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline';">
+  <title>z3r0's Heist Price Checker</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="container">
+    <h2>z3r0's Heist Price Checker</h2>
+
+    <div class="links">
+      <a href="#" id="kofi-link">Support on Ko-Fi</a>
+      <a href="#" id="discord-link">z3r0's Discord - The Singularity</a>
+    </div>
+
+    <div class="field">
+      <label for="league">League</label>
+      <select id="league">
+        <option value="Standard">Standard</option>
+        <option value="Hardcore">Hardcore</option>
+      </select>
+      <div class="league-custom-row">
+        <input type="text" id="leagueCustom" placeholder="Or type a league/event name...">
+        <button id="useCustomBtn" class="small-btn">Use</button>
+      </div>
+      <div id="leagueStatus" class="hint"></div>
+    </div>
+
+    <div class="field">
+      <label for="hotkey">Hotkey</label>
+      <input type="text" id="hotkey" placeholder="e.g. Ctrl+Shift+D">
+      <div class="hint">Use Electron accelerator format (Ctrl+Shift+D, Alt+Q, etc.)</div>
+    </div>
+
+    <div class="field row">
+      <label for="autoDismiss">Auto-dismiss overlay</label>
+      <input type="checkbox" id="autoDismiss">
+    </div>
+
+    <div class="field">
+      <label for="dismissMs">Dismiss after (ms)</label>
+      <input type="number" id="dismissMs" min="1000" max="30000" step="500">
+    </div>
+
+    <div class="actions">
+      <button id="saveBtn">Save</button>
+      <span id="status"></span>
+    </div>
+  </div>
+  <script src="settings.js"></script>
+</body>
+</html>

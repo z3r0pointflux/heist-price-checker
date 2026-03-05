@@ -1,7 +1,5 @@
 import sharp from 'sharp';
 import Tesseract from 'tesseract.js';
-import * as path from 'path';
-import * as os from 'os';
 import { BoundingBox } from './highlight';
 
 let worker: Tesseract.Worker | null = null;
@@ -33,16 +31,6 @@ export async function recognizeText(
     .sharpen()
     .png()
     .toBuffer();
-
-  // Save debug images
-  const ts = Date.now();
-  const debugRawPath = path.join(os.tmpdir(), `heistchecker-debug-raw-${ts}.png`);
-  const debugPath = path.join(os.tmpdir(), `heistchecker-debug-ocr-${ts}.png`);
-  await sharp(screenshotBuffer)
-    .extract({ left: cropX, top: region.y, width: cropW, height: cropH })
-    .png().toFile(debugRawPath);
-  await sharp(cropped).toFile(debugPath);
-  console.log(`[ocr] Debug images saved: raw=${debugRawPath} processed=${debugPath}`);
 
   const result = await worker!.recognize(cropped);
   const text = result.data.text.trim();

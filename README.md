@@ -4,6 +4,12 @@ A price checker overlay for Path of Exile Heist curio display items, powered by 
 
 Standard tools like Awakened PoE Trade don't work on Heist curio displays because items can't be hovered directly. This tool solves that by screenshotting the display, OCR-ing the item name, and showing pricing from poe.ninja in an overlay right on top of PoE.
 
+## Screenshots
+
+![Price overlay showing Tempering Orb value](assets/screenshots/overlay.png)
+
+![Settings window](assets/screenshots/settings.png)
+
 ## Features
 
 - **Unique items** — detects the unique name and shows the unlinked price from poe.ninja

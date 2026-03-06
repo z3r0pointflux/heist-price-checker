@@ -16,6 +16,22 @@
     "sharp": "^0.33.2",
     "tesseract.js": "^5.0.4"
   },
+  "build": {
+    "appId": "com.z3r0.heist-price-checker",
+    "productName": "z3r0s Heist Price Checker",
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "z3r0s-Heist-Price-Checker-Setup-${version}.exe"
+    },
+    "files": [
+      "dist/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ]
+  },
   "devDependencies": {
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1",

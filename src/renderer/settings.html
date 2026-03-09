@@ -34,6 +34,20 @@
       <div class="hint">Use Electron accelerator format (Ctrl+Shift+D, Alt+Q, etc.)</div>
     </div>
 
+    <div class="field">
+      <span class="label">Overlay position</span>
+      <div class="radio-group">
+        <label class="radio-option">
+          <input type="radio" name="overlayPosition" value="cursor" id="overlayPositionCursor">
+          Near cursor
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="overlayPosition" value="left" id="overlayPositionLeft">
+          Left side of screen
+        </label>
+      </div>
+    </div>
+
     <div class="field row">
       <label for="autoDismiss">Auto-dismiss overlay</label>
       <input type="checkbox" id="autoDismiss">
@@ -47,6 +61,13 @@
     <div class="actions">
       <button id="saveBtn">Save</button>
       <span id="status"></span>
+    </div>
+
+    <div class="log-section">
+      <span class="label">Log</span>
+      <div class="log-buttons">
+        <button id="openLogFolderBtn" class="small-btn">Open log folder</button>
+      </div>
     </div>
   </div>
   <script src="settings.js"></script>

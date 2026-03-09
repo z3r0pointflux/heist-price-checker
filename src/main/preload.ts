@@ -5,6 +5,9 @@ contextBridge.exposeInMainWorld('heistAPI', {
   onPriceResult: (callback: (data: any) => void) => {
     ipcRenderer.on('price-result', (_event, data) => callback(data));
   },
+  onAppendPriceResult: (callback: (data: any) => void) => {
+    ipcRenderer.on('append-price-result', (_event, data) => callback(data));
+  },
   dismissOverlay: () => {
     ipcRenderer.send('dismiss-overlay');
   },
@@ -14,5 +17,9 @@ contextBridge.exposeInMainWorld('heistAPI', {
   getLeagues: () => ipcRenderer.invoke('get-leagues'),
   onConfigSaved: (callback: () => void) => {
     ipcRenderer.on('config-saved', () => callback());
+  },
+  openLogFolder: () => ipcRenderer.invoke('open-log-folder'),
+  logToMain: (level: string, source: string, message: string, data?: object) => {
+    ipcRenderer.send('renderer-log', { level, source, message, data });
   },
 });

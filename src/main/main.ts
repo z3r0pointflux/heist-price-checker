@@ -87,7 +87,7 @@ function createLeftStackOverlayWindow(): BrowserWindow {
   });
 
   win.loadFile(path.join(__dirname, '..', 'renderer', 'overlay-stack.html'));
-  win.setIgnoreMouseEvents(false);
+  win.setIgnoreMouseEvents(true, { forward: true }); // Click-through so overlay doesn't block game
   win.setAlwaysOnTop(true, 'screen-saver');
 
   win.on('closed', () => {

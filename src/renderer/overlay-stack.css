@@ -4,24 +4,13 @@
   box-sizing: border-box;
 }
 
-/* Custom scrollbar - app style */
+/* Hide scrollbar - left stack overlay only */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  display: none;
 }
-
-::-webkit-scrollbar-track {
-  background: rgba(15, 10, 8, 0.95);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(150, 120, 60, 0.6);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #f0d060;
+html, body {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 body {

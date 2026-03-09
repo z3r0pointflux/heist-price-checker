@@ -7,6 +7,7 @@ export interface AppConfig {
   league: string;
   overlayDismissMs: number;
   autoDismiss: boolean;
+  overlayPosition: 'cursor' | 'left';
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -14,6 +15,7 @@ const DEFAULT_CONFIG: AppConfig = {
   league: 'Standard',
   overlayDismissMs: 5000,
   autoDismiss: true,
+  overlayPosition: 'cursor',
 };
 
 let currentConfig: AppConfig = { ...DEFAULT_CONFIG };

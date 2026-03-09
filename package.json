@@ -5,8 +5,8 @@
   "productName": "z3r0's Heist Price Checker",
   "main": "dist/main/main.js",
   "scripts": {
-    "start": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron .",
-    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron-builder",
+    "start": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','overlay-stack.html','overlay-stack.css','settings.html','settings.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron .",
+    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','overlay-stack.html','overlay-stack.css','settings.html','settings.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron-builder",
     "compile": "tsc"
   },
   "author": "",
@@ -30,6 +30,9 @@
       "dist/**/*",
       "assets/**/*",
       "node_modules/**/*"
+    ],
+    "extraResources": [
+      { "from": "assets/", "to": "assets/" }
     ]
   },
   "devDependencies": {

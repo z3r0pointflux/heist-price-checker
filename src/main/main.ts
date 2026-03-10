@@ -8,6 +8,7 @@ import {
   Tray,
 } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import { loadConfig, saveConfig, getConfig, AppConfig } from './config';
 import { takeScreenshot } from './screenshot';
 import { detectHighlight } from './highlight';
@@ -27,12 +28,32 @@ let overlayWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let isProcessing = false;
 
+// --- File logging ---
+const logPath = path.join(
+  app.getPath('userData'),
+  'heistchecker.log'
+);
+
+function log(message: string): void {
+  const line = `[${new Date().toISOString()}] ${message}`;
+  console.log(line);
+  try {
+    fs.appendFileSync(logPath, line + '\n');
+  } catch {}
+}
+
+function logError(message: string, err?: any): void {
+  const errStr = err instanceof Error ? err.stack || err.message : String(err ?? '');
+  const line = `[${new Date().toISOString()}] ERROR: ${message} ${errStr}`;
+  console.error(line);
+  try {
+    fs.appendFileSync(logPath, line + '\n');
+  } catch {}
+}
+
 function getAssetPath(filename: string): string {
-  // In development, assets are at project root; in production, in resources
-  if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'assets', filename);
-  }
-  return path.join(__dirname, '..', '..', 'assets', filename);
+  // app.getAppPath() returns project root in dev, app.asar in packaged
+  return path.join(app.getAppPath(), 'assets', filename);
 }
 
 function getPreloadPath(): string {
@@ -93,7 +114,19 @@ function createSettingsWindow(): void {
 }
 
 function createTray(): void {
-  tray = new Tray(getAssetPath('tray-icon.png'));
+  // Use .ico on Windows for proper tray icon display, .png elsewhere
+  const iconFile = process.platform === 'win32' ? 'tray-icon.ico' : 'tray-icon.png';
+  const iconPath = getAssetPath(iconFile);
+  log(`Creating tray with icon: ${iconPath}`);
+
+  try {
+    tray = new Tray(iconPath);
+  } catch (err) {
+    // Fallback to .png if .ico fails
+    logError('Failed to create tray with .ico, falling back to .png', err);
+    tray = new Tray(getAssetPath('tray-icon.png'));
+  }
+
   tray.setToolTip("z3r0's Heist Price Checker");
 
   const contextMenu = Menu.buildFromTemplate([
@@ -104,6 +137,11 @@ function createTray(): void {
   ]);
 
   tray.setContextMenu(contextMenu);
+
+  // Left-click opens settings
+  tray.on('click', () => {
+    createSettingsWindow();
+  });
 }
 
 function registerHotkey(): void {
@@ -115,9 +153,9 @@ function registerHotkey(): void {
   });
 
   if (!registered) {
-    console.error(`[main] Failed to register hotkey: ${config.hotkey}`);
+    logError(`Failed to register hotkey: ${config.hotkey}`);
   } else {
-    console.log(`[main] Hotkey registered: ${config.hotkey}`);
+    log(`Hotkey registered: ${config.hotkey}`);
   }
 }
 
@@ -128,33 +166,33 @@ async function handleHotkeyPress(): Promise<void> {
   try {
     // 1. Get cursor position
     const cursorPos = screen.getCursorScreenPoint();
-    console.log(`[main] Hotkey pressed, cursor at (${cursorPos.x}, ${cursorPos.y})`);
+    log(`Hotkey pressed, cursor at (${cursorPos.x}, ${cursorPos.y})`);
 
     // 2. Take screenshot
     const screenshotBuf = await takeScreenshot();
-    console.log(`[main] Screenshot captured (${screenshotBuf.length} bytes)`);
+    log(`Screenshot captured (${screenshotBuf.length} bytes)`);
 
     // 3. Detect highlight region
     const highlight = await detectHighlight(screenshotBuf, cursorPos);
     if (!highlight) {
-      console.log('[main] No highlight region detected');
+      log('No highlight region detected');
       showOverlayWithError('No highlighted item detected');
       return;
     }
-    console.log(`[main] Highlight found at (${highlight.x}, ${highlight.y}) ${highlight.width}x${highlight.height}`);
+    log(`Highlight found at (${highlight.x}, ${highlight.y}) ${highlight.width}x${highlight.height}`);
 
     // 4. OCR the region
     const lines = await recognizeText(screenshotBuf, highlight);
     if (lines.length === 0) {
-      console.log('[main] OCR returned no text');
+      log('OCR returned no text');
       showOverlayWithError('Could not read item text');
       return;
     }
-    console.log(`[main] OCR lines: ${JSON.stringify(lines)}`);
+    log(`OCR lines: ${JSON.stringify(lines)}`);
 
     // 5. Classify item & look up price
     const itemInfo = classifyItem(lines);
-    console.log(`[main] Item: ${JSON.stringify(itemInfo)}`);
+    log(`Item: ${JSON.stringify(itemInfo)}`);
 
     await ensureFreshCache();
 
@@ -167,7 +205,7 @@ async function handleHotkeyPress(): Promise<void> {
     if (!range && itemInfo.type === 'currency') {
       range = lookupPriceRange(itemInfo.searchTerm, 'Fragment');
     }
-    console.log(`[main] lookupPriceRange("${itemInfo.searchTerm}", ${itemTypeFilter}) => ${range ? `${range.name}: ${range.minChaos}-${range.maxChaos}c (${range.entries.length} variants)` : 'null'}`);
+    log(`lookupPriceRange("${itemInfo.searchTerm}", ${itemTypeFilter}) => ${range ? `${range.name}: ${range.minChaos}-${range.maxChaos}c (${range.entries.length} variants)` : 'null'}`);
 
     // 6. Show overlay
     showOverlay({
@@ -186,7 +224,7 @@ async function handleHotkeyPress(): Promise<void> {
       },
     });
   } catch (err) {
-    console.error('[main] Error during price check:', err);
+    logError('Error during price check:', err);
     showOverlayWithError('Error during price check');
   } finally {
     isProcessing = false;
@@ -211,7 +249,7 @@ function showOverlay(data: any): void {
 
   overlayWindow.setPosition(Math.round(posX), Math.round(posY));
   overlayWindow.showInactive();
-  console.log(`[main] Overlay shown at (${Math.round(posX)}, ${Math.round(posY)}), price: ${data.price ? data.price.name + ' ' + data.price.chaosValue + 'c' : 'none'}`);
+  log(`Overlay shown at (${Math.round(posX)}, ${Math.round(posY)}), price: ${data.price ? data.price.name + ' ' + data.price.chaosValue + 'c' : 'none'}`);
 
   // Ensure page is loaded before sending data
   if (overlayWindow.webContents.isLoading()) {
@@ -270,7 +308,7 @@ ipcMain.handle('save-config', async (_event, newConfig: AppConfig) => {
 
   // Refresh prices if league changed
   if (newConfig.league !== oldLeague) {
-    console.log(`[main] League changed from "${oldLeague}" to "${newConfig.league}", refreshing prices...`);
+    log(`League changed from "${oldLeague}" to "${newConfig.league}", refreshing prices...`);
     await fetchPriceData();
   }
 
@@ -295,6 +333,12 @@ ipcMain.handle('get-leagues', async () => {
 
 // App lifecycle
 app.whenReady().then(async () => {
+  log('App starting...');
+  log(`App path: ${app.getAppPath()}`);
+  log(`User data: ${app.getPath('userData')}`);
+  log(`Is packaged: ${app.isPackaged}`);
+  log(`Log file: ${logPath}`);
+
   loadConfig();
   createTray();
   registerHotkey();
@@ -303,16 +347,17 @@ app.whenReady().then(async () => {
   overlayWindow = createOverlayWindow();
 
   // Initialize OCR engine in background
-  console.log('[main] Initializing OCR...');
-  initOCR().then(() => console.log('[main] OCR ready'));
+  log('Initializing OCR...');
+  initOCR().then(() => log('OCR ready'));
 
   // Fetch price data
-  console.log('[main] Fetching price data...');
+  log('Fetching price data...');
   fetchPriceData()
-    .then(() => console.log('[main] Price data ready'))
-    .catch(err => console.error('[main] Price data fetch failed:', err));
+    .then(() => log('Price data ready'))
+    .catch(err => logError('Price data fetch failed:', err));
 
   startPeriodicRefresh();
+  log('App ready');
 });
 
 app.on('will-quit', () => {

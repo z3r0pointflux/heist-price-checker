@@ -49,7 +49,7 @@ npm start
 
 ## Settings
 
-Right-click the tray icon and select **Settings** to configure:
+Left-click the tray icon or right-click and select **Settings** to configure:
 
 | Setting | Description | Default |
 |---------|-------------|---------|
@@ -66,13 +66,78 @@ Right-click the tray icon and select **Settings** to configure:
 4. **Price Lookup** — shows price ranges from [poe.ninja](https://poe.ninja), filtering out influenced bases and linked variants (since heist curio items are uninfluenced/unlinked)
 5. **Overlay** — displays the result on top of PoE
 
-## Building for Distribution
+## Development
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) v18 or later
+- [Git](https://git-scm.com/)
+
+### Setup
+
+```bash
+git clone https://github.com/z3r0pointflux/heist-price-checker.git
+cd heist-price-checker
+npm install
+```
+
+### Running locally
+
+```bash
+npm start
+```
+
+This compiles TypeScript, copies renderer HTML/CSS to `dist/`, and launches Electron.
+
+### Project structure
+
+```
+src/
+  main/           # Electron main process
+    main.ts        # App entry point, tray, hotkey, overlay logic
+    config.ts      # User configuration (hotkey, league, etc.)
+    screenshot.ts  # Screen capture via PowerShell
+    highlight.ts   # Highlight/region detection
+    ocr.ts         # Tesseract.js OCR wrapper
+    itemDetect.ts  # Item classification (unique/rare/currency)
+    pricing.ts     # poe.ninja API + fuzzy price lookup
+    preload.ts     # Electron preload script
+  renderer/        # Electron renderer (browser) pages
+    overlay.html/css/ts   # Price overlay popup
+    settings.html/css/ts  # Settings window
+assets/
+  tray-icon.png    # Tray icon source
+  tray-icon.ico    # Windows tray icon
+```
+
+### Debugging
+
+The app writes a log file to your user data directory:
+
+```
+%APPDATA%/z3r0s-heist-price-checker/heistchecker.log
+```
+
+To find the exact path on your machine, check the app's console output at startup (it logs the path). When reporting issues, please include the contents of this log file.
+
+To run with Electron DevTools for the renderer windows, you can add `win.webContents.openDevTools()` in `main.ts` after creating a window.
+
+### Building for distribution
 
 ```bash
 npm run build
 ```
 
-Produces a Windows installer via electron-builder.
+Produces a Windows NSIS installer in `dist/`. The installer allows choosing an install directory and launches the app after installation.
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Tray icon not visible | Click the `^` arrow in the Windows taskbar to see hidden tray icons. You can drag it to the visible area. |
+| Hotkey doesn't work in-game | Make sure PoE is running in **Windowed Fullscreen** mode (not exclusive Fullscreen). |
+| No price found | The item may not be listed on poe.ninja, or OCR may have misread the name. Check the log file for details. |
+| App won't start | Check the log file at `%APPDATA%/z3r0s-heist-price-checker/heistchecker.log` for errors. |
 
 ## Support
 

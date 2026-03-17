@@ -1,6 +1,6 @@
 {
   "name": "z3r0s-heist-price-checker",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "z3r0's Heist Price Checker - Path of Exile Heist curio display price checker using poe.ninja",
   "productName": "z3r0's Heist Price Checker",
   "main": "dist/main/main.js",
@@ -19,13 +19,17 @@
   "build": {
     "appId": "com.z3r0.heist-price-checker",
     "productName": "z3r0s Heist Price Checker",
+    "icon": "assets/icon.ico",
     "win": {
       "target": "nsis",
+      "icon": "assets/icon.ico",
       "signAndEditExecutable": false
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
       "artifactName": "z3r0s-Heist-Price-Checker-Setup-${version}.exe",
       "runAfterFinish": true
     },

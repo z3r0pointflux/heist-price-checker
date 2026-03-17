@@ -60,6 +60,12 @@ function getPreloadPath(): string {
   return path.join(__dirname, 'preload.js');
 }
 
+function getIconPath(): string {
+  // In packaged app, assets is at resources/app/assets; in dev, it's at project root
+  const devPath = path.join(__dirname, '..', '..', 'assets', 'icon.ico');
+  return devPath;
+}
+
 function createOverlayWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 320,
@@ -71,6 +77,7 @@ function createOverlayWindow(): BrowserWindow {
     skipTaskbar: true,
     resizable: false,
     focusable: false,
+    icon: getIconPath(),
     webPreferences: {
       preload: getPreloadPath(),
       contextIsolation: true,
@@ -98,6 +105,7 @@ function createSettingsWindow(): void {
     minimizable: false,
     maximizable: false,
     title: "z3r0's Heist Price Checker - Settings",
+    icon: getIconPath(),
     webPreferences: {
       preload: getPreloadPath(),
       contextIsolation: true,

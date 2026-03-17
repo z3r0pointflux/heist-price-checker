@@ -320,15 +320,17 @@ ipcMain.handle('save-config', async (_event, newConfig: AppConfig) => {
 
 ipcMain.handle('get-leagues', async () => {
   try {
-    const response = await fetch('https://api.pathofexile.com/leagues?type=main&compact=1');
+    const response = await fetch('https://api.pathofexile.com/leagues?type=main&compact=1', {
+      headers: { 'User-Agent': 'HeistChecker/1.1' },
+    });
     if (response.ok) {
       const leagues = await response.json();
       return leagues.map((l: any) => l.id);
     }
   } catch {}
 
-  // Fallback: common league names
-  return ['Standard', 'Hardcore', 'Solo Self-Found (SSF Standard)', 'Hardcore SSF'];
+  // Fallback: common league names (update when new leagues launch)
+  return ['Mirage', 'Hardcore Mirage', 'Standard', 'Hardcore'];
 });
 
 // App lifecycle

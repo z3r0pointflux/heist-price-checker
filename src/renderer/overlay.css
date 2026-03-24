@@ -50,10 +50,14 @@ body {
   margin-bottom: 2px;
 }
 
-#divine-price {
-  font-size: 13px;
-  color: #d0a0ff;
+#variant-list {
   margin-bottom: 4px;
+}
+
+.variant-row {
+  font-size: 13px;
+  color: #f0d060;
+  padding: 1px 0;
 }
 
 #listings {

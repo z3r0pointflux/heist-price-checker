@@ -17,7 +17,6 @@ import { classifyItem } from './itemDetect';
 import {
   ensureFreshCache,
   fetchPriceData,
-  lookupPrice,
   lookupPriceRange,
   startPeriodicRefresh,
   stopPeriodicRefresh,
@@ -69,11 +68,12 @@ function getIconPath(): string {
 function createOverlayWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 320,
-    height: 200,
+    height: 350,
+    x: -9999,
+    y: -9999,
     show: false,
     frame: false,
     transparent: true,
-    alwaysOnTop: true,
     skipTaskbar: true,
     resizable: false,
     focusable: false,
@@ -87,7 +87,6 @@ function createOverlayWindow(): BrowserWindow {
 
   win.loadFile(path.join(__dirname, '..', 'renderer', 'overlay.html'));
   win.setIgnoreMouseEvents(false);
-  win.setAlwaysOnTop(true, 'screen-saver');
 
   return win;
 }
@@ -205,15 +204,20 @@ async function handleHotkeyPress(): Promise<void> {
     await ensureFreshCache();
 
     // Look up price range for the item
-    const itemTypeFilter = itemInfo.type === 'rare' ? 'BaseType'
-      : itemInfo.type === 'currency' ? 'Currency'
-      : undefined;
-    let range = lookupPriceRange(itemInfo.searchTerm, itemTypeFilter);
-    // Currency might also be in Fragment category
-    if (!range && itemInfo.type === 'currency') {
-      range = lookupPriceRange(itemInfo.searchTerm, 'Fragment');
+    let range: ReturnType<typeof lookupPriceRange> = null;
+    if (itemInfo.type === 'rare') {
+      range = lookupPriceRange(itemInfo.searchTerm, 'BaseType');
+    } else if (itemInfo.type === 'currency') {
+      range = lookupPriceRange(itemInfo.searchTerm, 'Currency');
+      if (!range) range = lookupPriceRange(itemInfo.searchTerm, 'Fragment');
+    } else {
+      // Unique — try each unique category
+      for (const cat of ['UniqueWeapon', 'UniqueArmour', 'UniqueAccessory', 'UniqueFlask', 'UniqueJewel']) {
+        range = lookupPriceRange(itemInfo.searchTerm, cat);
+        if (range) break;
+      }
     }
-    log(`lookupPriceRange("${itemInfo.searchTerm}", ${itemTypeFilter}) => ${range ? `${range.name}: ${range.minChaos}-${range.maxChaos}c (${range.entries.length} variants)` : 'null'}`);
+    log(`lookupPriceRange("${itemInfo.searchTerm}", ${itemInfo.type}) => ${range ? `${range.name}: ${range.minChaos}c (${range.entries.length} variants)` : 'null'}`);
 
     // 6. Show overlay
     showOverlay({
@@ -225,6 +229,11 @@ async function handleHotkeyPress(): Promise<void> {
         variantCount: range.entries.length,
         icon: range.icon,
         totalListings: range.entries.reduce((sum, e) => sum + e.listingCount, 0),
+        variants: range.entries.map(e => ({
+          label: e.variant || null,
+          chaos: e.chaosValue,
+          listings: e.listingCount,
+        })),
       } : null,
       position: {
         x: highlight.x + highlight.width + 10,
@@ -251,11 +260,12 @@ function showOverlay(data: any): void {
 
   // Keep overlay within screen bounds
   let posX = Math.min(x, bounds.x + bounds.width - 320);
-  let posY = Math.min(y, bounds.y + bounds.height - 200);
+  let posY = Math.min(y, bounds.y + bounds.height - 350);
   posX = Math.max(posX, bounds.x);
   posY = Math.max(posY, bounds.y);
 
   overlayWindow.setPosition(Math.round(posX), Math.round(posY));
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver');
   overlayWindow.showInactive();
   log(`Overlay shown at (${Math.round(posX)}, ${Math.round(posY)}), price: ${data.price ? data.price.name + ' ' + data.price.chaosValue + 'c' : 'none'}`);
 

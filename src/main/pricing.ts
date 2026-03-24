@@ -50,19 +50,12 @@ const CURRENCY_OVERVIEW_TYPES = [
 ];
 
 let allItems: PriceResult[] = [];
-let uniqueNames: Set<string> = new Set();
-let fuseIndex: Fuse<PriceResult> | null = null;
 let lastFetchTime = 0;
 const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
-
-export function getUniqueNames(): Set<string> {
-  return uniqueNames;
-}
 
 export async function fetchPriceData(): Promise<void> {
   const league = getConfig().league;
   const items: PriceResult[] = [];
-  const uniques = new Set<string>();
 
   console.log(`[pricing] Fetching poe.ninja data for league: ${league}`);
 
@@ -90,10 +83,6 @@ export async function fetchPriceData(): Promise<void> {
           links: item.links,
         };
         items.push(priceResult);
-
-        if (type.startsWith('Unique')) {
-          uniques.add(item.name);
-        }
       }
     } catch (err) {
       console.warn(`[pricing] Error fetching ${type}:`, err);
@@ -130,28 +119,11 @@ export async function fetchPriceData(): Promise<void> {
   }
 
   allItems = items;
-  uniqueNames = uniques;
   lastFetchTime = Date.now();
   baseTypeFuse = null; // Reset cached index
   currencyFuse = null;
 
-  // Build Fuse.js index
-  fuseIndex = new Fuse(allItems, {
-    keys: ['name'],
-    threshold: 0.35,
-    distance: 100,
-  });
-
-  console.log(`[pricing] Cached ${allItems.length} items, ${uniques.size} unique names`);
-}
-
-export function lookupPrice(searchTerm: string): PriceResult | null {
-  if (!fuseIndex || allItems.length === 0) return null;
-
-  const results = fuseIndex.search(searchTerm);
-  if (results.length === 0) return null;
-
-  return results[0].item;
+  console.log(`[pricing] Cached ${allItems.length} items`);
 }
 
 const INFLUENCE_KEYWORDS = ['shaper', 'elder', 'hunter', 'warlord', 'redeemer', 'crusader'];
@@ -180,16 +152,23 @@ export function lookupPriceRange(name: string, itemType?: string): PriceRange | 
     if (unlinked.length > 0) matches = unlinked;
   }
 
-  const chaosValues = matches.map(m => m.chaosValue).filter(v => v > 0);
-  if (chaosValues.length === 0) return null;
+  const withPrice = matches.filter(m => m.chaosValue > 0);
+  if (withPrice.length === 0) return null;
+
+  // Use median price across variants — resistant to outlier ilvl/variant prices
+  const sorted = [...withPrice].sort((a, b) => a.chaosValue - b.chaosValue);
+  const mid = Math.floor(sorted.length / 2);
+  const medianPrice = sorted.length % 2 === 1
+    ? sorted[mid].chaosValue
+    : (sorted[mid - 1].chaosValue + sorted[mid].chaosValue) / 2;
 
   return {
-    name: matches[0].name,
-    minChaos: Math.min(...chaosValues),
-    maxChaos: Math.max(...chaosValues),
-    entries: matches.sort((a, b) => a.chaosValue - b.chaosValue),
-    icon: matches[0].icon,
-    itemType: matches[0].itemType,
+    name: sorted[0].name,
+    minChaos: medianPrice,
+    maxChaos: medianPrice,
+    entries: sorted,
+    icon: sorted[mid].icon,
+    itemType: sorted[0].itemType,
   };
 }
 

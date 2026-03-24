@@ -1,4 +1,5 @@
-import { getUniqueNames, lookupBaseType, lookupCurrency } from './pricing';
+import { lookupCurrency } from './pricing';
+import { EXPERIMENTED_BASES, REPLICA_UNIQUES } from './heistData';
 import Fuse from 'fuse.js';
 
 export interface ItemInfo {
@@ -8,117 +9,110 @@ export interface ItemInfo {
   baseName?: string;
 }
 
+// Pre-built Fuse indices for known heist items (tight thresholds)
+const replicaFuse = new Fuse(REPLICA_UNIQUES, {
+  threshold: 0.3,
+  distance: 80,
+  includeScore: true,
+});
+
+const baseFuse = new Fuse(EXPERIMENTED_BASES, {
+  threshold: 0.3,
+  distance: 80,
+  includeScore: true,
+});
+
 export function classifyItem(lines: string[]): ItemInfo {
   if (lines.length === 0) {
     return { type: 'currency', searchTerm: '', displayName: 'Unknown' };
   }
 
-  // Try every line against the price database and pick the best match.
-  // This avoids relying on line position which is unreliable due to OCR noise.
-  const uniqueNames = getUniqueNames();
-  let bestUnique: { line: string; match: string; score: number } | null = null;
-  let bestBase: { line: string; match: string; score: number } | null = null;
+  // Heist curio displays only contain 3 item types:
+  // 1. Replica uniques (name like "Replica X")
+  // 2. Experimented base types (rare items with known base names)
+  // 3. Currency/fragments
 
-  if (uniqueNames.size > 0) {
-    const fuse = new Fuse(Array.from(uniqueNames), {
-      threshold: 0.4,
-      distance: 120,
-      includeScore: true,
-    });
+  let bestReplica: { match: string; score: number; line: string } | null = null;
+  let bestBase: { match: string; score: number; line: string } | null = null;
+  let bestCurrency: { match: string; score: number; line: string } | null = null;
 
-    for (const line of lines) {
-      // Skip short lines — they match too many uniques falsely (e.g. "Bow" → "Rainbowstride")
-      if (line.replace(/[^A-Za-z]/g, '').length < 6) continue;
-      const results = fuse.search(line);
-      if (results.length > 0 && results[0].score !== undefined) {
-        if (!bestUnique || results[0].score < bestUnique.score) {
-          bestUnique = { line, match: results[0].item, score: results[0].score };
+  for (const line of lines) {
+    const alphaLen = line.replace(/[^A-Za-z]/g, '').length;
+    if (alphaLen < 4) continue;
+
+    // Try replica unique match
+    if (alphaLen >= 6) {
+      const replicaResults = replicaFuse.search(line);
+      if (replicaResults.length > 0 && replicaResults[0].score !== undefined) {
+        if (!bestReplica || replicaResults[0].score < bestReplica.score) {
+          bestReplica = { match: replicaResults[0].item, score: replicaResults[0].score, line };
         }
       }
     }
-  }
 
-  // Also try each line as a base type lookup (dedicated base type index)
-  for (const line of lines) {
-    if (line.replace(/[^A-Za-z]/g, '').length < 4) continue;
-    const result = lookupBaseType(line);
-    if (result) {
-      if (!bestBase || result.score < bestBase.score) {
-        bestBase = { line, match: result.item.name, score: result.score };
+    // Try experimented base match
+    const baseResults = baseFuse.search(line);
+    if (baseResults.length > 0 && baseResults[0].score !== undefined) {
+      if (!bestBase || baseResults[0].score < bestBase.score) {
+        bestBase = { match: baseResults[0].item, score: baseResults[0].score, line };
+      }
+    }
+
+    // Try currency match (from poe.ninja data)
+    const currencyResult = lookupCurrency(line);
+    if (currencyResult) {
+      if (!bestCurrency || currencyResult.score < bestCurrency.score) {
+        bestCurrency = { match: currencyResult.item.name, score: currencyResult.score, line };
       }
     }
   }
 
-  // Try each line as a currency lookup
-  let bestCurrency: { line: string; match: string; score: number } | null = null;
-  for (const line of lines) {
-    if (line.replace(/[^A-Za-z]/g, '').length < 4) continue;
-    const result = lookupCurrency(line);
-    if (result) {
-      if (!bestCurrency || result.score < bestCurrency.score) {
-        bestCurrency = { line, match: result.item.name, score: result.score };
-      }
-    }
-  }
-
-  console.log(`[itemDetect] Best unique match: ${bestUnique ? `"${bestUnique.match}" (score: ${bestUnique.score.toFixed(3)}) from line "${bestUnique.line}"` : 'none'}`);
+  console.log(`[itemDetect] Best replica match: ${bestReplica ? `"${bestReplica.match}" (score: ${bestReplica.score.toFixed(3)}) from line "${bestReplica.line}"` : 'none'}`);
   console.log(`[itemDetect] Best base match: ${bestBase ? `"${bestBase.match}" (score: ${bestBase.score.toFixed(3)}) from line "${bestBase.line}"` : 'none'}`);
   console.log(`[itemDetect] Best currency match: ${bestCurrency ? `"${bestCurrency.match}" (score: ${bestCurrency.score.toFixed(3)}) from line "${bestCurrency.line}"` : 'none'}`);
 
-  // Currency match — check before uniques/bases since currency names are distinctive
-  // and description text (picked up by OCR) would match base types falsely
-  if (bestCurrency && bestCurrency.score < 0.35) {
-    // Only use currency if it's a better match than base type, or no good base match
-    if (!bestBase || bestCurrency.score <= bestBase.score) {
+  // Pick the best match across all categories
+  type Match = { type: 'unique' | 'rare' | 'currency'; match: string; score: number };
+  const candidates: Match[] = [];
+
+  if (bestReplica && bestReplica.score < 0.3) {
+    candidates.push({ type: 'unique', match: bestReplica.match, score: bestReplica.score });
+  }
+  if (bestBase && bestBase.score < 0.3) {
+    candidates.push({ type: 'rare', match: bestBase.match, score: bestBase.score });
+  }
+  if (bestCurrency && bestCurrency.score < 0.3) {
+    candidates.push({ type: 'currency', match: bestCurrency.match, score: bestCurrency.score });
+  }
+
+  // Sort by score (lowest = best match)
+  candidates.sort((a, b) => a.score - b.score);
+
+  if (candidates.length > 0) {
+    const best = candidates[0];
+    if (best.type === 'unique') {
       return {
-        type: 'currency',
-        searchTerm: bestCurrency.match,
-        displayName: bestCurrency.match,
+        type: 'unique',
+        searchTerm: best.match,
+        displayName: best.match,
       };
     }
-  }
-
-  // If we have both a unique and base match from DIFFERENT lines,
-  // the item is likely unique (unique name + base type on separate lines)
-  if (bestUnique && bestBase && bestUnique.line !== bestBase.line && bestUnique.score < 0.4) {
+    if (best.type === 'rare') {
+      return {
+        type: 'rare',
+        searchTerm: best.match,
+        displayName: best.match,
+        baseName: best.match,
+      };
+    }
     return {
-      type: 'unique',
-      searchTerm: bestUnique.match,
-      displayName: bestUnique.match,
-      baseName: bestBase.match,
+      type: 'currency',
+      searchTerm: best.match,
+      displayName: best.match,
     };
   }
 
-  // Base type match — rare item (prefer this over loose unique matches)
-  if (bestBase && bestBase.score < 0.2) {
-    return {
-      type: 'rare',
-      searchTerm: bestBase.match,
-      displayName: bestBase.match,
-      baseName: bestBase.match,
-    };
-  }
-
-  // Unique match only (no good base type found)
-  if (bestUnique && bestUnique.score < 0.4) {
-    return {
-      type: 'unique',
-      searchTerm: bestUnique.match,
-      displayName: bestUnique.match,
-    };
-  }
-
-  // Base type match only — rare item
-  if (bestBase) {
-    return {
-      type: 'rare',
-      searchTerm: bestBase.match,
-      displayName: bestBase.match,
-      baseName: bestBase.match,
-    };
-  }
-
-  // Last resort: try the longest line as a general search
+  // Fallback: try the longest line as currency
   const longest = [...lines].sort((a, b) => b.length - a.length)[0];
   return {
     type: 'currency',

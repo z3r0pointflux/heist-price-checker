@@ -1,7 +1,7 @@
 const itemNameEl = document.getElementById('item-name')!;
 const baseNameEl = document.getElementById('base-name')!;
 const chaosPriceEl = document.getElementById('chaos-price')!;
-const divinePriceEl = document.getElementById('divine-price')!;
+const variantListEl = document.getElementById('variant-list')!;
 const listingsEl = document.getElementById('listings')!;
 const priceSection = document.getElementById('price-section')!;
 const noPriceEl = document.getElementById('no-price')!;
@@ -28,19 +28,30 @@ window.heistAPI.onPriceResult((data: any) => {
     priceSection.style.display = 'block';
     noPriceEl.style.display = 'none';
 
-    // Show price range
-    if (price.minChaos === price.maxChaos) {
+    // If we have labeled variants (ilvl breakdown for base types), show as list
+    const labeled = (price.variants || []).filter((v: any) => v.label);
+    if (labeled.length > 1) {
+      chaosPriceEl.style.display = 'none';
+      variantListEl.innerHTML = '';
+      // Sort by label (ilvl) ascending
+      labeled.sort((a: any, b: any) => {
+        const aNum = parseInt(a.label, 10);
+        const bNum = parseInt(b.label, 10);
+        if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+        return a.label.localeCompare(b.label);
+      });
+      for (const v of labeled) {
+        const row = document.createElement('div');
+        row.className = 'variant-row';
+        row.textContent = `ilvl ${v.label}: ${formatPrice(v.chaos)}c`;
+        variantListEl.appendChild(row);
+      }
+      variantListEl.style.display = 'block';
+    } else {
+      // Single price (currency, uniques, single-variant bases)
       chaosPriceEl.textContent = `${formatPrice(price.minChaos)} Chaos`;
-    } else {
-      chaosPriceEl.textContent = `${formatPrice(price.minChaos)} - ${formatPrice(price.maxChaos)} Chaos`;
-    }
-
-    // Show variant count
-    if (price.variantCount > 1) {
-      divinePriceEl.textContent = `${price.variantCount} variants on poe.ninja`;
-      divinePriceEl.style.display = 'block';
-    } else {
-      divinePriceEl.style.display = 'none';
+      chaosPriceEl.style.display = 'block';
+      variantListEl.style.display = 'none';
     }
 
     listingsEl.textContent = `~${price.totalListings} listings`;

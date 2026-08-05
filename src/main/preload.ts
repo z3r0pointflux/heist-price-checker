@@ -4,6 +4,9 @@ contextBridge.exposeInMainWorld('heistAPI', {
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   onPriceResult: (callback: (data: any) => void) => {
     ipcRenderer.on('price-result', (_event, data) => callback(data));
+    // Tell main the listener is attached so it can flush a result that arrived
+    // while this window was still loading.
+    ipcRenderer.send('overlay-ready');
   },
   dismissOverlay: () => {
     ipcRenderer.send('dismiss-overlay');

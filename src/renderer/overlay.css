@@ -31,6 +31,7 @@ body {
 #item-name.unique { color: #af6025; }
 #item-name.rare { color: #ff7; }
 #item-name.currency { color: #e0e0e0; }
+#item-name.unidentified { color: #c98a3c; }
 
 #base-name {
   font-size: 12px;
@@ -48,6 +49,19 @@ body {
   color: #f0d060;
   font-weight: bold;
   margin-bottom: 2px;
+}
+
+#price-caption {
+  font-size: 10px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+/* Cheapest listing is backed by very little data — worth a second look. */
+#price-caption.low-confidence {
+  color: #c98a3c;
 }
 
 #variant-list {

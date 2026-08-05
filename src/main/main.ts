@@ -16,16 +16,29 @@ import { initOCR, recognizeText, shutdownOCR } from './ocr';
 import { classifyItem } from './itemDetect';
 import {
   ensureFreshCache,
+  fetchAvailableLeagues,
   fetchPriceData,
+  getPriceDataStatus,
+  hasPriceData,
   lookupPriceRange,
   startPeriodicRefresh,
   stopPeriodicRefresh,
+  variantLabel,
 } from './pricing';
 
 let tray: Tray | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let isProcessing = false;
+
+// The renderer only starts listening once its script has run. Sending before
+// that drops the payload silently and leaves the overlay showing nothing, so
+// hold the most recent result until the renderer says it is listening.
+let overlayReady = false;
+let pendingOverlayData: any = null;
+// A single shared dismiss timer: stacking one per check meant an earlier timer
+// could hide a newer overlay seconds after it appeared.
+let dismissTimer: ReturnType<typeof setTimeout> | null = null;
 
 // --- File logging ---
 const logPath = path.join(
@@ -85,6 +98,7 @@ function createOverlayWindow(): BrowserWindow {
     },
   });
 
+  overlayReady = false;
   win.loadFile(path.join(__dirname, '..', 'renderer', 'overlay.html'));
   win.setIgnoreMouseEvents(false);
 
@@ -189,19 +203,29 @@ async function handleHotkeyPress(): Promise<void> {
     log(`Highlight found at (${highlight.x}, ${highlight.y}) ${highlight.width}x${highlight.height}`);
 
     // 4. OCR the region
-    const lines = await recognizeText(screenshotBuf, highlight);
+    const { lines, nameLines } = await recognizeText(screenshotBuf, highlight);
     if (lines.length === 0) {
       log('OCR returned no text');
       showOverlayWithError('Could not read item text');
       return;
     }
-    log(`OCR lines: ${JSON.stringify(lines)}`);
+    log(`OCR name lines: ${JSON.stringify(nameLines)} | all: ${JSON.stringify(lines)}`);
 
     // 5. Classify item & look up price
-    const itemInfo = classifyItem(lines);
+    const itemInfo = classifyItem(lines, nameLines);
     log(`Item: ${JSON.stringify(itemInfo)}`);
 
     await ensureFreshCache();
+
+    // Without price data every lookup returns null, which used to render as an
+    // item name and a blank price — indistinguishable from "this item is worth
+    // nothing". Say what actually went wrong instead.
+    if (!hasPriceData()) {
+      const status = getPriceDataStatus();
+      log(`No price data available: ${JSON.stringify(status)}`);
+      showOverlayWithError(describePriceDataFailure(status));
+      return;
+    }
 
     // Look up price range for the item
     let range: ReturnType<typeof lookupPriceRange> = null;
@@ -217,7 +241,7 @@ async function handleHotkeyPress(): Promise<void> {
         if (range) break;
       }
     }
-    log(`lookupPriceRange("${itemInfo.searchTerm}", ${itemInfo.type}) => ${range ? `${range.name}: ${range.minChaos}c (${range.entries.length} variants)` : 'null'}`);
+    log(`lookupPriceRange("${itemInfo.searchTerm}", ${itemInfo.type}) => ${range ? `${range.name}: lowest ${range.minChaos}c of ${range.entries.length} variants (max ${range.maxChaos}c)` : 'null'}`);
 
     // 6. Show overlay
     showOverlay({
@@ -226,11 +250,13 @@ async function handleHotkeyPress(): Promise<void> {
         name: range.name,
         minChaos: range.minChaos,
         maxChaos: range.maxChaos,
+        lowestListings: range.lowestListings,
+        lowestLabel: range.lowestLabel ?? null,
         variantCount: range.entries.length,
         icon: range.icon,
         totalListings: range.entries.reduce((sum, e) => sum + e.listingCount, 0),
         variants: range.entries.map(e => ({
-          label: e.variant || null,
+          label: variantLabel(e) || null,
           chaos: e.chaosValue,
           listings: e.listingCount,
         })),
@@ -267,25 +293,45 @@ function showOverlay(data: any): void {
   overlayWindow.setPosition(Math.round(posX), Math.round(posY));
   overlayWindow.setAlwaysOnTop(true, 'screen-saver');
   overlayWindow.showInactive();
-  log(`Overlay shown at (${Math.round(posX)}, ${Math.round(posY)}), price: ${data.price ? data.price.name + ' ' + data.price.chaosValue + 'c' : 'none'}`);
+  log(`Overlay shown at (${Math.round(posX)}, ${Math.round(posY)}), price: ${data.price ? data.price.name + ' ' + data.price.minChaos + 'c' : 'none'}`);
 
-  // Ensure page is loaded before sending data
-  if (overlayWindow.webContents.isLoading()) {
-    overlayWindow.webContents.once('did-finish-load', () => {
-      overlayWindow!.webContents.send('price-result', data);
-    });
-  } else {
+  // Deliver now if the renderer is listening, otherwise let 'overlay-ready' flush it.
+  if (overlayReady) {
     overlayWindow.webContents.send('price-result', data);
+  } else {
+    pendingOverlayData = data;
   }
 
-  // Auto-dismiss
+  // Auto-dismiss — replace any timer from a previous check.
+  if (dismissTimer) {
+    clearTimeout(dismissTimer);
+    dismissTimer = null;
+  }
   const config = getConfig();
   if (config.autoDismiss) {
-    setTimeout(() => {
+    dismissTimer = setTimeout(() => {
+      dismissTimer = null;
       if (overlayWindow && !overlayWindow.isDestroyed()) {
         overlayWindow.hide();
       }
     }, config.overlayDismissMs);
+  }
+}
+
+function describePriceDataFailure(status: ReturnType<typeof getPriceDataStatus>): string {
+  switch (status.state) {
+    case 'network-error':
+      return 'Could not reach poe.ninja';
+    case 'league-retired':
+      return status.switchedTo
+        ? `"${status.league}" has ended — switched to ${status.switchedTo}, retry`
+        : `League "${status.league}" has ended — pick a new one in Settings`;
+    case 'league-unknown':
+      return `poe.ninja has no data for "${status.league}" — check Settings`;
+    case 'empty':
+      return `No price data for ${status.league}`;
+    default:
+      return 'Price data unavailable';
   }
 }
 
@@ -306,6 +352,14 @@ ipcMain.on('open-external', (_event, url: string) => {
   // Only allow known safe URLs
   if (url.startsWith('https://ko-fi.com/') || url.startsWith('https://discord.gg/')) {
     shell.openExternal(url);
+  }
+});
+
+ipcMain.on('overlay-ready', () => {
+  overlayReady = true;
+  if (pendingOverlayData && overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('price-result', pendingOverlayData);
+    pendingOverlayData = null;
   }
 });
 
@@ -337,18 +391,31 @@ ipcMain.handle('save-config', async (_event, newConfig: AppConfig) => {
 });
 
 ipcMain.handle('get-leagues', async () => {
+  // Source the list from poe.ninja rather than the PoE API: these are the leagues
+  // we can actually price. The PoE API also lists SSF/Ruthless leagues that have
+  // no economy data, which just produce an empty overlay.
+  try {
+    const leagues = await fetchAvailableLeagues();
+    if (leagues.length > 0) return leagues;
+  } catch (err) {
+    logError('Could not fetch leagues from poe.ninja:', err);
+  }
+
+  // Fallback: the PoE league API, filtered to leagues with a tradeable economy.
   try {
     const response = await fetch('https://api.pathofexile.com/leagues?type=main&compact=1', {
-      headers: { 'User-Agent': 'HeistChecker/1.1' },
+      headers: { 'User-Agent': 'HeistChecker/1.2' },
     });
     if (response.ok) {
       const leagues = await response.json();
-      return leagues.map((l: any) => l.id);
+      return leagues
+        .map((l: any) => l.id)
+        .filter((id: string) => !/SSF|Ruthless|Solo Self-Found/i.test(id));
     }
   } catch {}
 
-  // Fallback: common league names (update when new leagues launch)
-  return ['Mirage', 'Hardcore Mirage', 'Standard', 'Hardcore'];
+  // Last resort. Only reached if the machine is offline.
+  return ['Standard', 'Hardcore'];
 });
 
 // App lifecycle

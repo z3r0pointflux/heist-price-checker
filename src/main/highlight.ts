@@ -21,14 +21,18 @@ export async function detectHighlight(
   const imgWidth = metadata.width!;
   const imgHeight = metadata.height!;
 
-  // Capture a region around the cursor where the item name should be.
-  // In heist curio displays, item names appear at/below cursor level.
-  const regionWidth = 500;
-  const regionHeight = 180;
+  // This is a cursor-relative crop, not real tooltip detection: what lands in
+  // frame shifts with the mouse, which is why two checks of the same item could
+  // disagree. Widening it means the name is inside the window across a much
+  // larger range of cursor positions and tooltip placements (PoE draws the
+  // tooltip above or below the cursor depending on room on screen).
+  const regionWidth = 760;
+  const regionHeight = 420;
 
-  // Center horizontally on cursor, extend well above cursor to catch full tooltip
+  // Centre horizontally, and bias upward since the item name sits at the top of
+  // the tooltip — while still keeping headroom below for downward-drawn ones.
   const x = Math.max(0, Math.min(cursorPos.x - regionWidth / 2, imgWidth - regionWidth));
-  const y = Math.max(0, Math.min(cursorPos.y - 100, imgHeight - regionHeight));
+  const y = Math.max(0, Math.min(cursorPos.y - regionHeight * 0.6, imgHeight - regionHeight));
 
   const box: BoundingBox = {
     x: Math.round(x),

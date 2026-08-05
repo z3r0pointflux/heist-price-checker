@@ -21,6 +21,41 @@ export interface ItemInfo {
  * Best curated-list or poe.ninja match across the given lines, or null.
  * Used for the rarity-colour name pass, where every line is a candidate name.
  */
+/**
+ * Forms of a line worth matching: the line itself, plus a copy with short
+ * leading/trailing tokens removed.
+ *
+ * OCR leaves crumbs around the text ("Loe WRAITH AXE", "Ne Fo VICTORY HUNGER Ii")
+ * which inflate the fuzzy score enough to push a correct match past threshold.
+ * Both forms are tried because real bases like "War Axe" and "Sun Plate" start
+ * with a short token that must not be stripped.
+ */
+function candidateForms(line: string): string[] {
+  const tokens = line.split(/\s+/).filter(Boolean);
+  const forms = new Set<string>([line]);
+
+  let start = 0;
+  while (start < tokens.length - 1 && tokens[start].length <= 3) start++;
+  let end = tokens.length;
+  while (end > start + 1 && tokens[end - 1].length <= 2) end--;
+  if (start > 0 || end < tokens.length) forms.add(tokens.slice(start, end).join(' '));
+
+  return [...forms].filter(f => f.replace(/[^A-Za-z]/g, '').length >= 4);
+}
+
+/**
+ * Reject matches where the text read is a very different length from the name
+ * matched. The OCR crumb "IUNGER" scored 0.227 against "Voidbringer" and got a
+ * rare axe priced as a unique; on length alone it never should have been a
+ * candidate.
+ */
+function lengthCompatible(query: string, match: string): boolean {
+  const a = query.replace(/[^A-Za-z]/g, '').length;
+  const b = match.replace(/[^A-Za-z]/g, '').length;
+  if (a === 0 || b === 0) return false;
+  return Math.min(a, b) / Math.max(a, b) >= 0.65;
+}
+
 function matchLines(lines: string[], label: string): ItemInfo | null {
   // Walk top-down and take the first line that resolves. A PoE tooltip prints
   // the item name above its base type, so scoring globally let an exact hit on
@@ -31,8 +66,9 @@ function matchLines(lines: string[], label: string): ItemInfo | null {
     if (plausibility(line) < 0.9) continue;
 
     let best: { type: 'unique' | 'rare'; match: string; score: number } | null = null;
-    const consider = (type: 'unique' | 'rare', match: string | undefined, score: number | undefined, limit: number) => {
+    const consider = (type: 'unique' | 'rare', query: string, match: string | undefined, score: number | undefined, limit: number) => {
       if (!match || score === undefined || score >= limit) return;
+      if (!lengthCompatible(query, match)) return;
       // Within one line prefer the unique reading: a replica's name and its base
       // both match something, and the name is what gets priced.
       if (!best || score < best.score || (type === 'unique' && best.type === 'rare' && score < limit)) {
@@ -40,15 +76,19 @@ function matchLines(lines: string[], label: string): ItemInfo | null {
       }
     };
 
-    const rep = replicaFuse.search(line)[0];
-    consider('unique', rep?.item, rep?.score, 0.3);
-    const uniq = lookupUniqueName(line);
-    consider('unique', uniq?.item.name, uniq?.score, 0.35);
+    for (const form of candidateForms(line)) {
+      const rep = replicaFuse.search(form)[0];
+      consider('unique', form, rep?.item, rep?.score, 0.3);
+      const uniq = lookupUniqueName(form);
+      consider('unique', form, uniq?.item.name, uniq?.score, 0.35);
+    }
     if (!best) {
-      const curated = baseFuse.search(line)[0];
-      consider('rare', curated?.item, curated?.score, 0.3);
-      const bt = lookupBaseType(line);
-      consider('rare', bt?.item.name, bt?.score, 0.35);
+      for (const form of candidateForms(line)) {
+        const curated = baseFuse.search(form)[0];
+        consider('rare', form, curated?.item, curated?.score, 0.3);
+        const bt = lookupBaseType(form);
+        consider('rare', form, bt?.item.name, bt?.score, 0.35);
+      }
     }
 
     if (best) {
@@ -200,10 +240,12 @@ export function classifyItem(lines: string[], nameLines: string[] = []): ItemInf
   // how a stat line reading "Armour" became "Armourer's Scrap".
   for (const line of lines) {
     if (plausibility(line) < 0.9) continue;
-    const cur = lookupCurrency(line);
-    if (cur && cur.score < 0.2) {
-      console.log(`[itemDetect] Currency matched "${cur.item.name}" (score ${cur.score.toFixed(3)})`);
-      return { type: 'currency', searchTerm: cur.item.name, displayName: cur.item.name };
+    for (const form of candidateForms(line)) {
+      const cur = lookupCurrency(form);
+      if (cur && cur.score < 0.2 && lengthCompatible(form, cur.item.name)) {
+        console.log(`[itemDetect] Currency matched "${cur.item.name}" (score ${cur.score.toFixed(3)})`);
+        return { type: 'currency', searchTerm: cur.item.name, displayName: cur.item.name };
+      }
     }
   }
 

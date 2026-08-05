@@ -69,6 +69,15 @@ const NOISE = [
   ['fragment only', ['IUNGER']],
 ];
 
+// Hotkey pressed with no tooltip on screen: OCR returns scenery scraps. Must be
+// reported as "no tooltip", not as an unreadable item.
+const NO_TOOLTIP = [
+  ['empty floor / minimap',
+   ['tos', 'Ba RE', 'ALE Vio s Ag Ds', 'FP gine mn nos', 'AE me jr', 'pr v', 'ZR RL 7 MES',
+    'B.S i AF Ye SP', 'by i Ve Eq ye', 'SRR SC', 'A voll Pl A MN 4S J FH', 'IAL 2 Va',
+    'Pa PLC', 're i aR', 'NIRA ED', 'gs Nu A J']],
+];
+
 let fail = 0;
 const ck = (c, m) => { if (!c) fail++; console.log(`${c ? 'PASS' : 'FAIL'}  ${m}`); };
 
@@ -93,6 +102,19 @@ const ck = (c, m) => { if (!c) fail++; console.log(`${c ? 'PASS' : 'FAIL'}  ${m}
   for (const [label, lines] of NOISE) {
     const r = classifyItem(lines, []);
     ck(r.unidentified === true, `${label.padEnd(34)} -> ${r.unidentified ? 'unidentified' : `WRONGLY matched "${r.displayName}"`}`);
+  }
+
+  console.log('\n=== No tooltip on screen ===');
+  for (const [label, lines] of NO_TOOLTIP) {
+    const r = classifyItem(lines, []);
+    ck(r.noTooltip === true, `${label.padEnd(34)} -> ${r.noTooltip ? 'no tooltip (correct)' : `reported as "${r.displayName}"`}`);
+  }
+
+  // A real tooltip must never be mistaken for "nothing on screen".
+  console.log('\n=== Real tooltips must not be called empty ===');
+  for (const [label, nameLines, all] of CASES) {
+    const r = classifyItem(all, nameLines);
+    ck(r.noTooltip !== true, `${label.padEnd(34)} -> not flagged empty`);
   }
 
   console.log(`\n${fail === 0 ? 'ALL PASSED' : fail + ' FAILED'}`);

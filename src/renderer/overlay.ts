@@ -12,7 +12,10 @@ window.heistAPI.onPriceResult((data: any) => {
 
   // Set item name with color class. An unidentified item's "name" is only the
   // most name-like OCR line, so label it instead of passing it off as the item.
-  if (itemInfo.unidentified) {
+  if (itemInfo.noTooltip) {
+    itemNameEl.textContent = 'No item tooltip found';
+    itemNameEl.className = 'unidentified';
+  } else if (itemInfo.unidentified) {
     itemNameEl.textContent = "Couldn't identify item";
     itemNameEl.className = 'unidentified';
   } else {
@@ -21,7 +24,10 @@ window.heistAPI.onPriceResult((data: any) => {
   }
 
   // Set base name
-  if (itemInfo.unidentified) {
+  if (itemInfo.noTooltip) {
+    baseNameEl.textContent = 'Hover the item until its tooltip shows, then press again';
+    baseNameEl.style.display = 'block';
+  } else if (itemInfo.unidentified) {
     baseNameEl.textContent = itemInfo.displayName
       ? `read: "${itemInfo.displayName}" — try re-hovering`
       : 'try re-hovering the item';

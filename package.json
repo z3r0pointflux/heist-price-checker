@@ -1,6 +1,6 @@
 {
   "name": "z3r0s-heist-price-checker",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "z3r0's Heist Price Checker - Path of Exile Heist curio display price checker using poe.ninja",
   "productName": "z3r0's Heist Price Checker",
   "main": "dist/main/main.js",

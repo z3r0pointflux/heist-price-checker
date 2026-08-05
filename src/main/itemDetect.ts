@@ -9,6 +9,21 @@ export interface ItemInfo {
   baseName?: string;
   /** No item could be identified — the name shown is only a best guess. */
   unidentified?: boolean;
+  /** Nothing tooltip-like was on screen at all, as opposed to an unreadable one. */
+  noTooltip?: boolean;
+}
+
+/**
+ * Whether the text read plausibly came from an item tooltip.
+ *
+ * When the hotkey fires with no tooltip up — mouse over empty floor, or pressed
+ * before the tooltip faded in — OCR still returns a dozen scraps of scenery
+ * ("Ba RE", "ALE Vio s Ag Ds") and the user got told the item was unreadable.
+ * Real item names carry a long word; scenery noise tops out around four letters.
+ */
+function looksLikeTooltip(lines: string[]): boolean {
+  return lines.some(line =>
+    line.split(/\s+/).some(w => w.length >= 6 && /[aeiou]/i.test(w)));
 }
 
 /**
@@ -258,11 +273,13 @@ export function classifyItem(lines: string[], nameLines: string[] = []): ItemInf
   // Genuinely unrecognised. Show the most name-like line rather than whichever
   // string happened to be longest, and flag it so the overlay can say so.
   const best = [...lines].sort((a, b) => plausibility(b) - plausibility(a))[0] ?? '';
-  console.log(`[itemDetect] No match; best-guess line "${best}"`);
+  const noTooltip = !looksLikeTooltip(lines);
+  console.log(`[itemDetect] No match; ${noTooltip ? 'no tooltip in frame' : `best-guess line "${best}"`}`);
   return {
     type: 'currency',
-    searchTerm: best,
-    displayName: best,
+    searchTerm: noTooltip ? '' : best,
+    displayName: noTooltip ? '' : best,
     unidentified: true,
+    noTooltip,
   };
 }

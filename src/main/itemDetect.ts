@@ -61,19 +61,17 @@ function matchLines(lines: string[], label: string): ItemInfo | null {
   // the item name above its base type, so scoring globally let an exact hit on
   // "Great Helmet" outrank the fuzzy hit on "Replica Veil of the Night" one line
   // above it — naming the base instead of the unique that carries the value.
-  for (const line of lines) {
-    if (line.replace(/[^A-Za-z]/g, '').length < 4) continue;
-    if (plausibility(line) < 0.9) continue;
+  type Candidate = { type: 'unique' | 'rare'; match: string; score: number; line: number; from: string };
+  const candidates: Candidate[] = [];
 
-    let best: { type: 'unique' | 'rare'; match: string; score: number } | null = null;
+  lines.forEach((line, index) => {
+    if (line.replace(/[^A-Za-z]/g, '').length < 4) return;
+    if (plausibility(line) < 0.9) return;
+
     const consider = (type: 'unique' | 'rare', query: string, match: string | undefined, score: number | undefined, limit: number) => {
       if (!match || score === undefined || score >= limit) return;
       if (!lengthCompatible(query, match)) return;
-      // Within one line prefer the unique reading: a replica's name and its base
-      // both match something, and the name is what gets priced.
-      if (!best || score < best.score || (type === 'unique' && best.type === 'rare' && score < limit)) {
-        best = { type, match, score };
-      }
+      candidates.push({ type, match, score, line: index, from: query });
     };
 
     for (const form of candidateForms(line)) {
@@ -81,28 +79,36 @@ function matchLines(lines: string[], label: string): ItemInfo | null {
       consider('unique', form, rep?.item, rep?.score, 0.3);
       const uniq = lookupUniqueName(form);
       consider('unique', form, uniq?.item.name, uniq?.score, 0.35);
+      const curated = baseFuse.search(form)[0];
+      consider('rare', form, curated?.item, curated?.score, 0.3);
+      const bt = lookupBaseType(form);
+      consider('rare', form, bt?.item.name, bt?.score, 0.35);
     }
-    if (!best) {
-      for (const form of candidateForms(line)) {
-        const curated = baseFuse.search(form)[0];
-        consider('rare', form, curated?.item, curated?.score, 0.3);
-        const bt = lookupBaseType(form);
-        consider('rare', form, bt?.item.name, bt?.score, 0.35);
-      }
-    }
+  });
 
-    if (best) {
-      const hit = best as { type: 'unique' | 'rare'; match: string; score: number };
-      console.log(`[itemDetect] ${label} matched "${hit.match}" (${hit.type}, score ${hit.score.toFixed(3)}) from "${line}"`);
-      return {
-        type: hit.type,
-        searchTerm: hit.match,
-        displayName: hit.match,
-        ...(hit.type === 'rare' ? { baseName: hit.match } : {}),
-      };
-    }
-  }
-  return null;
+  if (candidates.length === 0) return null;
+
+  // Quality of the match decides, not where it sat in the tooltip. Taking the
+  // first line that matched anything let OCR crumbs win: "KX TRIETT" strips to
+  // "TRIETT" and hits "Stiletto" at 0.343, beating "Hussar Brigandine" at 0.000
+  // two lines below. Line order only breaks a near-tie, which is what separates
+  // a unique's name from its base type when both match exactly.
+  const bestScore = Math.min(...candidates.map(c => c.score));
+  const TIE = 0.08;
+  const contenders = candidates.filter(c => c.score <= bestScore + TIE);
+  contenders.sort((a, b) =>
+    a.line - b.line ||
+    (a.type === b.type ? 0 : a.type === 'unique' ? -1 : 1) ||
+    a.score - b.score);
+
+  const hit = contenders[0];
+  console.log(`[itemDetect] ${label} matched "${hit.match}" (${hit.type}, score ${hit.score.toFixed(3)}) from "${hit.from}"`);
+  return {
+    type: hit.type,
+    searchTerm: hit.match,
+    displayName: hit.match,
+    ...(hit.type === 'rare' ? { baseName: hit.match } : {}),
+  };
 }
 
 function plausibility(line: string): number {

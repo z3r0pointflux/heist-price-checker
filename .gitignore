@@ -6,3 +6,7 @@ config.json
 *.traineddata
 .claude/
 heistchecker.txt
+
+# Capture corpus for test/corpus.test.js — large PNGs, kept locally.
+# Commit them if you want the corpus test to run on another machine or in CI.
+test/fixtures/

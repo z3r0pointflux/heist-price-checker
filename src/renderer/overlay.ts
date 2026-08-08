@@ -1,11 +1,22 @@
+const overlayEl = document.getElementById('overlay')!;
 const itemNameEl = document.getElementById('item-name')!;
 const baseNameEl = document.getElementById('base-name')!;
 const chaosPriceEl = document.getElementById('chaos-price')!;
+const priceUnitEl = document.getElementById('price-unit')!;
 const priceCaptionEl = document.getElementById('price-caption')!;
 const variantListEl = document.getElementById('variant-list')!;
 const listingsEl = document.getElementById('listings')!;
 const priceSection = document.getElementById('price-section')!;
 const noPriceEl = document.getElementById('no-price')!;
+
+// The panel's left spine carries the rarity colour so the chrome itself stays
+// neutral. Set from the same value that colours the name, not duplicated in CSS.
+const SPINE_COLOR: Record<string, string> = {
+  unique: 'var(--rarity-unique)',
+  rare: 'var(--rarity-rare)',
+  currency: 'var(--rarity-currency)',
+  unidentified: 'var(--warn)',
+};
 
 window.heistAPI.onPriceResult((data: any) => {
   const { itemInfo, price } = data;
@@ -22,6 +33,8 @@ window.heistAPI.onPriceResult((data: any) => {
     itemNameEl.textContent = itemInfo.displayName;
     itemNameEl.className = itemInfo.type;
   }
+
+  overlayEl.style.borderLeftColor = SPINE_COLOR[itemNameEl.className] || 'var(--edge-mid)';
 
   // Set base name
   if (itemInfo.noTooltip) {
@@ -46,9 +59,10 @@ window.heistAPI.onPriceResult((data: any) => {
     priceSection.style.display = 'block';
     noPriceEl.style.display = 'none';
 
-    // Headline is always the cheapest listing on poe.ninja.
-    chaosPriceEl.textContent = `${formatPrice(price.minChaos)} Chaos`;
-    chaosPriceEl.style.display = 'block';
+    // Headline is always the cheapest listing on poe.ninja. The unit lives in
+    // the markup so the number can be sized independently of it.
+    chaosPriceEl.textContent = formatPrice(price.minChaos);
+    priceUnitEl.style.display = 'inline';
 
     // Say where that number came from, and flag it when it rests on very few
     // listings so a thin outlier isn't mistaken for a reliable price.
@@ -81,8 +95,14 @@ window.heistAPI.onPriceResult((data: any) => {
         const row = document.createElement('div');
         row.className = 'variant-row';
         // Base-type labels are item levels; unique labels are variant names.
-        const label = /^\d+$/.test(String(v.label)) ? `ilvl ${v.label}` : v.label;
-        row.textContent = `${label}: ${formatPrice(v.chaos)}c`;
+        // Label and value are separate nodes so the prices align in a column.
+        const label = document.createElement('span');
+        label.className = 'v-label';
+        label.textContent = /^\d+$/.test(String(v.label)) ? `ilvl ${v.label}` : v.label;
+        const value = document.createElement('span');
+        value.className = 'v-value';
+        value.textContent = `${formatPrice(v.chaos)}c`;
+        row.append(label, value);
         variantListEl.appendChild(row);
       }
       variantListEl.style.display = 'block';
@@ -90,10 +110,22 @@ window.heistAPI.onPriceResult((data: any) => {
       variantListEl.style.display = 'none';
     }
 
-    listingsEl.textContent = `~${price.totalListings} listings`;
+    // The caption already carries the count behind the headline price. Repeating
+    // it here only says something new when the total is larger than that.
+    const total = price.totalListings;
+    if (typeof total === 'number' && total > 0 && total !== price.lowestListings) {
+      listingsEl.textContent = `~${total} listings across all variants`;
+      listingsEl.style.display = 'block';
+    } else {
+      listingsEl.style.display = 'none';
+    }
   } else {
     priceSection.style.display = 'none';
-    noPriceEl.style.display = 'block';
+    // Only a real lookup miss is a pricing failure. When the tooltip was never
+    // found, or the name could not be read, the header already says so and this
+    // line just reads as a second, unrelated error.
+    const lookupFailed = !itemInfo.noTooltip && !itemInfo.unidentified;
+    noPriceEl.style.display = lookupFailed ? 'block' : 'none';
   }
 });
 

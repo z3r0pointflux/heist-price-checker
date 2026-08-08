@@ -1,0 +1,71 @@
+/* Shared design tokens for the overlay and the settings window.
+ *
+ * The palette is measured off real captures in test/fixtures rather than guessed.
+ * Path of Exile separates its UI from the game world by being cool and
+ * desaturated against a warm, saturated environment: the tooltip interior samples
+ * at rgb(34,36,37) — warmth (R-B) of -3, saturation 8% — while the Heist scene
+ * immediately beside it samples at rgb(56,41,33) — warmth +23, saturation 41%.
+ *
+ * So every surface here stays on the cool, desaturated side of that line. The
+ * previous palette sat on the warm side (panel rgba(15,10,8) at warmth +7, a gold
+ * border at 60% saturation) which put it in the same hue family as torchlight,
+ * wood and brass — which is why it muddied into the background instead of
+ * reading as an interface.
+ *
+ * Contrast therefore comes from the EDGE and from text luminance, never from
+ * making the panel lighter. */
+
+:root {
+  /* Tells the engine to render scrollbars, dropdown lists and checkboxes in
+     their dark variants. Without it the settings window gets a bright default
+     scrollbar and a white native dropdown, which no amount of CSS on our own
+     elements can reach. */
+  color-scheme: dark;
+
+  /* Surfaces. Cool neutral, never brown. */
+  --surface:        #0e1112;
+  --surface-raised: #171b1d;
+  --surface-sunken: #080a0b;
+
+  /* Edges. The game frames its own tooltip with a light neutral hairline
+     (sampled #7d7876) — that crisp edge is what makes it legible over any
+     scenery, so it is reproduced here rather than the muted gold hairline. */
+  --edge:        #363c3e;
+  --edge-mid:    #4d5456;
+  --edge-strong: #79807f;
+
+  /* Text. Measured: stat values #fbfbfb, help text #7e7e7e, body #c8c8c8
+     (which the old stylesheet already had right). */
+  --text:        #c8c8c8;
+  --text-bright: #f1f3f3;
+  --text-dim:    #7e7e7e;
+  --text-faint:  #545a5b;
+
+  /* Rarity colours, canonical to PoE. Magic was confirmed against the capture
+     at #8686fb; currency name text highlights to #f5ebd3. These are the only
+     saturated colours in the design — on a cool neutral panel they become the
+     one warm thing on screen, so the item name pops instead of blending. */
+  --rarity-normal:   #c8c8c8;
+  --rarity-magic:    #8888ff;
+  --rarity-rare:     #ffff77;
+  --rarity-unique:   #af6025;
+  --rarity-currency: #e4d6b4;
+
+  /* Status. Amber warns on thin listing data; red is failure only. */
+  --warn:  #d9a441;
+  --error: #cf6f71;
+  --ok:    #7fb08a;
+
+  /* Type. Fontin is PoE's own face — used when the player happens to have it
+     installed, with a humanist serif fallback that carries the same feel. The
+     display face is for names only; data and numbers use the UI sans so digits
+     stay tabular and columns line up. */
+  --font-display: 'Fontin SmallCaps', 'Fontin', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+
+  /* A dark halo, so the panel detaches from busy scenery and bright torchlight
+     without needing a lighter fill. */
+  --shadow-panel:
+    0 1px 2px rgba(0, 0, 0, 0.7),
+    0 6px 24px rgba(0, 0, 0, 0.72);
+}

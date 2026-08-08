@@ -1,3 +1,5 @@
+@import url('theme.css');
+
 * {
   margin: 0;
   padding: 0;
@@ -5,25 +7,68 @@
 }
 
 body {
-  font-family: 'Segoe UI', sans-serif;
-  background: #1a1a2e;
-  color: #c8c8c8;
-  padding: 20px;
+  font-family: var(--font-ui);
+  /* Was #1a1a2e — a navy-purple that appears in no part of Path of Exile and is
+     the single most recognisable generated-dark-theme background. */
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
 }
 
 .container {
-  max-width: 360px;
-  margin: 0 auto;
+  padding: 18px 22px 22px;
+}
+
+/* Header ------------------------------------------------------------------ */
+
+header {
+  border-bottom: 1px solid var(--edge);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 h2 {
-  color: #f0d060;
-  margin-bottom: 20px;
-  font-size: 18px;
+  font-family: var(--font-display);
+  font-variant: small-caps;
+  font-weight: 500;
+  font-size: 21px;
+  letter-spacing: 0.4px;
+  color: var(--text-bright);
 }
 
+.subtitle {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Links ------------------------------------------------------------------- */
+
+.links {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.links a {
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 12px;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  padding-bottom: 1px;
+}
+
+.links a:hover {
+  color: var(--text-bright);
+  border-bottom-color: var(--edge-strong);
+}
+
+/* Fields ------------------------------------------------------------------ */
+
 .field {
-  margin-bottom: 14px;
+  margin-bottom: 15px;
 }
 
 .field.row {
@@ -34,41 +79,60 @@ h2 {
 
 label {
   display: block;
-  font-size: 13px;
-  color: #aaa;
-  margin-bottom: 4px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  margin-bottom: 5px;
 }
 
 .field.row label {
   margin-bottom: 0;
+  color: var(--text);
+  font-size: 13px;
 }
 
 input[type="text"],
 input[type="number"],
 select {
   width: 100%;
-  padding: 6px 10px;
-  border: 1px solid #444;
-  border-radius: 3px;
-  background: #0f0f1a;
-  color: #e0e0e0;
-  font-size: 14px;
+  padding: 7px 9px;
+  /* Sunken fill + hairline, matching the overlay: contrast from the edge, not
+     from lightening the surface. */
+  background: var(--surface-sunken);
+  border: 1px solid var(--edge);
+  border-radius: 2px;
+  color: var(--text-bright);
+  font-family: var(--font-ui);
+  font-size: 13px;
+}
+
+input[type="number"] {
+  font-variant-numeric: tabular-nums;
 }
 
 select {
   cursor: pointer;
 }
 
+input[type="text"]:hover,
+input[type="number"]:hover,
+select:hover {
+  border-color: var(--edge-mid);
+}
+
+/* Focus ring is a neutral light edge rather than gold — gold in PoE means
+   currency, and it collided with the warm scenery besides. */
 input[type="text"]:focus,
 input[type="number"]:focus,
 select:focus {
-  border-color: #f0d060;
   outline: none;
+  border-color: var(--edge-strong);
+  box-shadow: 0 0 0 1px var(--edge-mid);
 }
 
 input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
+  accent-color: #6d7a7e;
   cursor: pointer;
 }
 
@@ -82,78 +146,63 @@ input[type="checkbox"] {
   flex: 1;
 }
 
-.small-btn {
-  padding: 6px 12px;
-  background: #555;
-  color: #ddd;
-  border: none;
-  border-radius: 3px;
-  font-size: 12px;
+.hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+/* Buttons ----------------------------------------------------------------- */
+
+button {
+  font-family: var(--font-ui);
+  font-size: 13px;
+  padding: 7px 20px;
+  /* Was #af6025 — the unique-item rarity colour. In PoE that colour means
+     "this item is unique", so using it as a button fill reads as a category
+     error to anyone who plays the game. Neutral raised surface instead. */
+  background: var(--surface-raised);
+  color: var(--text-bright);
+  border: 1px solid var(--edge-mid);
+  border-radius: 2px;
   cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--edge-strong);
+  background: #1f2426;
+}
+
+button:active {
+  background: var(--surface-sunken);
+}
+
+.small-btn {
+  font-size: 12px;
+  padding: 7px 13px;
   white-space: nowrap;
 }
 
-.small-btn:hover {
-  background: #666;
-}
-
-.hint {
-  font-size: 11px;
-  color: #666;
-  margin-top: 3px;
-}
+/* Actions ----------------------------------------------------------------- */
 
 .actions {
-  margin-top: 20px;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--edge);
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-button {
-  padding: 8px 24px;
-  background: #af6025;
-  color: white;
-  border: none;
-  border-radius: 3px;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #c97030;
-}
-
 #status {
   font-size: 12px;
-  color: #6a6;
+  color: var(--ok);
 }
 
 #leagueStatus {
-  color: #6a6;
+  color: var(--text-faint);
 }
 
 #leagueStatus.error {
-  color: #a66;
-}
-
-.links {
-  margin-bottom: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid #333;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.links a {
-  color: #7a9ec9;
-  text-decoration: none;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.links a:hover {
-  color: #a0c0e8;
-  text-decoration: underline;
+  color: var(--error);
 }

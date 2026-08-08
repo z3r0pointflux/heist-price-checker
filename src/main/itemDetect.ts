@@ -55,6 +55,16 @@ function candidateForms(line: string): string[] {
   while (end > start + 1 && tokens[end - 1].length <= 2) end--;
   if (start > 0 || end < tokens.length) forms.add(tokens.slice(start, end).join(' '));
 
+  // A more aggressive trailing trim, for the three-character crumbs the lock
+  // icons at the ends of a name box leave behind ("… ENRICHING Gib", "… Puc").
+  // Those cost enough score to push an otherwise exact name past threshold.
+  // This is added as an extra form rather than replacing the others: every form
+  // is scored and the best wins, so a real three-letter word like the "Orb" in
+  // "Tailoring Orb" is still matched by the untrimmed variant.
+  let hardEnd = tokens.length;
+  while (hardEnd > start + 1 && tokens[hardEnd - 1].length <= 3) hardEnd--;
+  if (hardEnd < tokens.length) forms.add(tokens.slice(start, hardEnd).join(' '));
+
   return [...forms].filter(f => f.replace(/[^A-Za-z]/g, '').length >= 4);
 }
 
@@ -181,7 +191,10 @@ export function classifyItem(lines: string[], nameLines: string[] = []): ItemInf
     if (alphaLen >= 6) {
       const replicaResults = replicaFuse.search(line);
       if (replicaResults.length > 0 && replicaResults[0].score !== undefined) {
-        if (!bestReplica || replicaResults[0].score < bestReplica.score) {
+        if (
+          lengthCompatible(line, replicaResults[0].item) &&
+          (!bestReplica || replicaResults[0].score < bestReplica.score)
+        ) {
           bestReplica = { match: replicaResults[0].item, score: replicaResults[0].score, line };
         }
       }
@@ -190,14 +203,26 @@ export function classifyItem(lines: string[], nameLines: string[] = []): ItemInf
     // Try experimented base match
     const baseResults = baseFuse.search(line);
     if (baseResults.length > 0 && baseResults[0].score !== undefined) {
-      if (!bestBase || baseResults[0].score < bestBase.score) {
+      if (
+        lengthCompatible(line, baseResults[0].item) &&
+        (!bestBase || baseResults[0].score < bestBase.score)
+      ) {
         bestBase = { match: baseResults[0].item, score: baseResults[0].score, line };
       }
     }
 
-    // Try currency match (from poe.ninja data)
-    const currencyResult = lookupCurrency(line);
-    if (currencyResult) {
+    // Try currency match (from poe.ninja data). The length guard matters most
+    // here: the stackable pool grew from ~150 names to ~900 when the exchange
+    // categories were added, and a five-letter stat label ("LIMIT") found
+    // "Acclimatisation" at 0.230 — beating the correctly-read scarab name on the
+    // line above it and pricing the item as a divination card.
+    // Score the crumb-stripped forms too, not just the raw line — a trailing
+    // "Gib" was enough to hold an exact scarab name at 0.346, just outside the
+    // 0.3 candidate threshold, so the item priced as nothing at all.
+    for (const form of candidateForms(line)) {
+      const currencyResult = lookupCurrency(form);
+      if (!currencyResult) continue;
+      if (!lengthCompatible(form, currencyResult.item.name)) continue;
       if (!bestCurrency || currencyResult.score < bestCurrency.score) {
         bestCurrency = { match: currencyResult.item.name, score: currencyResult.score, line };
       }

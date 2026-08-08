@@ -52,6 +52,21 @@ interface NinjaItem {
 const NINJA_BASE = 'https://poe.ninja/poe1/api';
 const NINJA_HEADERS = { 'User-Agent': 'HeistChecker/1.2' };
 
+/** A price row from the exchange endpoint. Names are not on the row itself. */
+interface ExchangeLine {
+  id: string;
+  primaryValue?: number;
+  volumePrimaryValue?: number;
+}
+
+/** The name/icon half of an exchange payload, joined to a line by `id`. */
+interface ExchangeItem {
+  id: string;
+  name?: string;
+  image?: string;
+  category?: string;
+}
+
 interface NinjaLeague {
   name: string;
   url: string;
@@ -76,6 +91,39 @@ const ITEM_OVERVIEW_TYPES = [
 const CURRENCY_OVERVIEW_TYPES = [
   'Currency',
   'Fragment',
+];
+
+/**
+ * Categories served only by the exchange endpoint.
+ *
+ * These are not on `economy/stash/{version}/…` at all: `item/overview` returns a
+ * bare 404 for every one of them, and `currency/overview` answers 200 with an
+ * empty `lines` array for *any* type string — including nonsense — so neither
+ * status code nor payload gave a hint that the request was misdirected. They
+ * live under a separate path with the literal segment `current` where the stash
+ * endpoints take a rotating snapshot version.
+ *
+ * Scarabs were the reported bug, but the same gap silently swallowed essences,
+ * fossils, oils, divination cards, delirium orbs, omens, artifacts, resonators,
+ * tattoos and allflame embers — roughly 750 further items a curio display can
+ * hold, none of which could ever be priced.
+ *
+ * Currency and Fragment are deliberately absent: they are served here too, but
+ * the stash endpoint carries real listing counts and this one does not, so they
+ * stay on the richer source rather than being fetched twice.
+ */
+const EXCHANGE_OVERVIEW_TYPES = [
+  'Scarab',
+  'Essence',
+  'Fossil',
+  'Oil',
+  'DivinationCard',
+  'DeliriumOrb',
+  'Omen',
+  'Artifact',
+  'Resonator',
+  'Tattoo',
+  'AllflameEmber',
 ];
 
 let allItems: PriceResult[] = [];
@@ -276,6 +324,49 @@ export async function fetchPriceData(): Promise<void> {
     }
   }
 
+  // Fetch exchange overviews. Different path, different payload shape: prices
+  // come back in `lines` keyed by a slug id, and the display names live in a
+  // parallel `items` array that has to be joined on that id.
+  for (const type of EXCHANGE_OVERVIEW_TYPES) {
+    try {
+      const url =
+        `${NINJA_BASE}/economy/exchange/current/overview` +
+        `?league=${encodeURIComponent(league)}&type=${type}`;
+      const response = await fetch(url, { headers: NINJA_HEADERS });
+      if (!response.ok) {
+        console.warn(`[pricing] Failed to fetch ${type}: ${response.status}`);
+        failures++;
+        continue;
+      }
+      const data = await response.json();
+      const lines: ExchangeLine[] = data.lines || [];
+      const namesById = new Map<string, ExchangeItem>(
+        (data.items || []).map((i: ExchangeItem) => [i.id, i]),
+      );
+
+      for (const line of lines) {
+        const meta = namesById.get(line.id);
+        // Without the join there is no display name to match OCR against, so a
+        // row we cannot name is worth nothing to us.
+        if (!meta?.name) continue;
+        items.push({
+          name: meta.name,
+          chaosValue: line.primaryValue ?? 0,
+          divineValue: 0,
+          // This endpoint reports trade volume, not a listing count. Volume is a
+          // different quantity, so it is not passed off as one — the overlay
+          // simply omits the count for these rather than showing a wrong number.
+          listingCount: 0,
+          icon: meta.image ? `https://web.poecdn.com${meta.image}` : undefined,
+          itemType: type,
+        });
+      }
+    } catch (err) {
+      console.warn(`[pricing] Error fetching ${type}:`, err);
+      failures++;
+    }
+  }
+
   // Chaos Orb is the unit every other price is quoted in, so poe.ninja never
   // lists it. Curio displays do drop them, and without an entry it matches
   // nothing and shows no price — add it explicitly at its definitional value.
@@ -374,6 +465,15 @@ let uniqueFuse: Fuse<PriceResult> | null = null;
 const UNIQUE_TYPES = ['UniqueWeapon', 'UniqueArmour', 'UniqueAccessory', 'UniqueFlask', 'UniqueJewel'];
 
 /**
+ * Types the item detector classifies as `currency` — i.e. anything stackable
+ * that shows a one-line name box rather than a name plus base type. Derived from
+ * the fetch lists so a category added there cannot be forgotten here; keeping
+ * the two in sync by hand is what hid the scarab data even after it was cached.
+ */
+export const STACKABLE_TYPES_LIST = [...CURRENCY_OVERVIEW_TYPES, ...EXCHANGE_OVERVIEW_TYPES];
+const STACKABLE_TYPES = new Set(STACKABLE_TYPES_LIST);
+
+/**
  * Fuzzy-match against every unique poe.ninja prices, not just the replica list.
  * Curio displays mostly hold replicas, but a non-replica unique should still
  * resolve rather than falling through to the noise fallback.
@@ -409,7 +509,10 @@ export function lookupCurrency(searchTerm: string): { item: PriceResult; score: 
   if (allItems.length === 0) return null;
 
   if (!currencyFuse) {
-    const currencyItems = allItems.filter(i => i.itemType === 'Currency' || i.itemType === 'Fragment');
+    // Every stackable category the OCR path treats as "currency". Filtering on
+    // Currency/Fragment alone left the exchange categories cached but
+    // unreachable — the data would be in memory and still never match.
+    const currencyItems = allItems.filter(i => STACKABLE_TYPES.has(i.itemType));
     currencyFuse = new Fuse(currencyItems, {
       keys: ['name'],
       threshold: 0.4,

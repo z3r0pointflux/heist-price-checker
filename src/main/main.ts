@@ -22,6 +22,7 @@ import {
   hasPriceData,
   lookupPriceRange,
   startPeriodicRefresh,
+  STACKABLE_TYPES_LIST,
   stopPeriodicRefresh,
   variantLabel,
 } from './pricing';
@@ -113,7 +114,10 @@ function createSettingsWindow(): void {
 
   settingsWindow = new BrowserWindow({
     width: 450,
-    height: 500,
+    // Tall enough for the whole form: at 500 the last field and the Save button
+    // pushed past the bottom and the window grew a scrollbar it cannot scroll
+    // usefully, since it is not resizable.
+    height: 566,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -134,6 +138,52 @@ function createSettingsWindow(): void {
   });
 }
 
+// A tray context menu is drawn by Windows, so it takes no styling from the app.
+// What it can do is stop being three bare verbs: the two things worth knowing
+// without opening Settings are which league prices come from and what the
+// hotkey is, so both are shown inline as disabled rows.
+function priceStatusLabel(): string {
+  const status = getPriceDataStatus();
+  switch (status.state) {
+    case 'ok':
+      return `${status.itemCount.toLocaleString()} items loaded`;
+    case 'empty':
+      return 'no data returned';
+    case 'league-retired':
+      return status.switchedTo ? `switched to ${status.switchedTo}` : 'league retired';
+    case 'league-unknown':
+      return `unknown league "${status.league}"`;
+    case 'network-error':
+      return 'offline';
+    case 'never-fetched':
+      return 'loading…';
+  }
+}
+
+function refreshTrayMenu(): void {
+  if (!tray) return;
+
+  const config = getConfig();
+
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: `League: ${config.league}`, enabled: false },
+    { label: `Prices: ${priceStatusLabel()}`, enabled: false },
+    { type: 'separator' },
+    { label: `Price check\t${config.hotkey}`, enabled: false },
+    { type: 'separator' },
+    { label: 'Settings…', click: () => createSettingsWindow() },
+    {
+      label: 'Refresh prices now',
+      click: async () => {
+        await fetchPriceData();
+        refreshTrayMenu();
+      },
+    },
+    { type: 'separator' },
+    { label: 'Quit', click: () => app.quit() },
+  ]));
+}
+
 function createTray(): void {
   // Use .ico on Windows for proper tray icon display, .png elsewhere
   const iconFile = process.platform === 'win32' ? 'tray-icon.ico' : 'tray-icon.png';
@@ -149,15 +199,7 @@ function createTray(): void {
   }
 
   tray.setToolTip("z3r0's Heist Price Checker");
-
-  const contextMenu = Menu.buildFromTemplate([
-    { label: 'Settings', click: () => createSettingsWindow() },
-    { label: 'Refresh Prices', click: () => fetchPriceData() },
-    { type: 'separator' },
-    { label: 'Quit', click: () => app.quit() },
-  ]);
-
-  tray.setContextMenu(contextMenu);
+  refreshTrayMenu();
 
   // Left-click opens settings
   tray.on('click', () => {
@@ -200,10 +242,12 @@ async function handleHotkeyPress(): Promise<void> {
       showOverlayWithError('No highlighted item detected');
       return;
     }
-    log(`Highlight found at (${highlight.x}, ${highlight.y}) ${highlight.width}x${highlight.height}`);
+    const { region, nameBox } = highlight;
+    log(`Region (${region.x}, ${region.y}) ${region.width}x${region.height}` +
+        `${nameBox ? `, name box y ${nameBox.y} h ${nameBox.height}` : ', no name box'}`);
 
     // 4. OCR the region
-    const { lines, nameLines } = await recognizeText(screenshotBuf, highlight);
+    const { lines, nameLines } = await recognizeText(screenshotBuf, region, nameBox);
     if (lines.length === 0) {
       log('OCR returned no text');
       showOverlayWithError('Could not read item text');
@@ -232,8 +276,14 @@ async function handleHotkeyPress(): Promise<void> {
     if (itemInfo.type === 'rare') {
       range = lookupPriceRange(itemInfo.searchTerm, 'BaseType');
     } else if (itemInfo.type === 'currency') {
-      range = lookupPriceRange(itemInfo.searchTerm, 'Currency');
-      if (!range) range = lookupPriceRange(itemInfo.searchTerm, 'Fragment');
+      // "currency" here means any stackable, which now covers scarabs, essences,
+      // fossils and the rest of the exchange categories. Trying only Currency
+      // and Fragment meant a scarab could be detected and cached and still
+      // price as null, because its itemType matched neither.
+      for (const cat of STACKABLE_TYPES_LIST) {
+        range = lookupPriceRange(itemInfo.searchTerm, cat);
+        if (range) break;
+      }
     } else {
       // Unique — try each unique category
       for (const cat of ['UniqueWeapon', 'UniqueArmour', 'UniqueAccessory', 'UniqueFlask', 'UniqueJewel']) {
@@ -262,8 +312,10 @@ async function handleHotkeyPress(): Promise<void> {
         })),
       } : null,
       position: {
-        x: highlight.x + highlight.width + 10,
-        y: highlight.y,
+        // Anchor beside the name box when we found one — that is the tooltip's
+        // real position, rather than wherever the search window happened to sit.
+        x: (nameBox ?? region).x + (nameBox ?? region).width + 10,
+        y: (nameBox ?? region).y,
       },
     });
   } catch (err) {
@@ -387,6 +439,9 @@ ipcMain.handle('save-config', async (_event, newConfig: AppConfig) => {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.webContents.send('config-saved');
   }
+
+  // The tray menu shows league and hotkey, so it goes stale unless rebuilt here.
+  refreshTrayMenu();
   return true;
 });
 
@@ -440,8 +495,14 @@ app.whenReady().then(async () => {
   // Fetch price data
   log('Fetching price data...');
   fetchPriceData()
-    .then(() => log('Price data ready'))
-    .catch(err => logError('Price data fetch failed:', err));
+    .then(() => {
+      log('Price data ready');
+      refreshTrayMenu();
+    })
+    .catch(err => {
+      logError('Price data fetch failed:', err);
+      refreshTrayMenu();
+    });
 
   startPeriodicRefresh();
   log('App ready');

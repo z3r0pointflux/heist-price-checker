@@ -1,3 +1,5 @@
+@import url('theme.css');
+
 * {
   margin: 0;
   padding: 0;
@@ -6,88 +8,155 @@
 
 body {
   background: transparent;
-  font-family: 'Segoe UI', 'Fontin', sans-serif;
-  color: #c8c8c8;
+  font-family: var(--font-ui);
+  color: var(--text);
   -webkit-app-region: no-drag;
   cursor: pointer;
+  /* Room for the panel's drop shadow inside the fixed 320x350 window. */
+  padding: 8px;
+  -webkit-font-smoothing: antialiased;
 }
 
+/* The panel. Sharp corners, one crisp hairline, and a rarity spine down the
+   left edge — that spine is the only place the item's colour touches the frame,
+   which keeps the chrome neutral while still identifying the item at a glance. */
 #overlay {
-  background: rgba(15, 10, 8, 0.92);
-  border: 1px solid rgba(150, 120, 60, 0.6);
-  border-radius: 4px;
-  padding: 12px 16px;
-  min-width: 260px;
-  max-width: 300px;
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-left: 3px solid var(--edge-mid);
+  box-shadow: var(--shadow-panel);
+  min-width: 252px;
+  max-width: 292px;
+  overflow: hidden;
+}
+
+/* Header sits on a slightly raised fill, mirroring the way the game separates an
+   item's name box from its stat block. */
+#head {
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--edge);
+  padding: 9px 12px 8px;
 }
 
 #item-name {
-  font-size: 15px;
-  font-weight: bold;
-  margin-bottom: 2px;
-  line-height: 1.3;
+  font-family: var(--font-display);
+  font-variant: small-caps;
+  font-size: 17px;
+  line-height: 1.2;
+  letter-spacing: 0.3px;
+  color: var(--rarity-normal);
+  word-break: break-word;
 }
 
-#item-name.unique { color: #af6025; }
-#item-name.rare { color: #ff7; }
-#item-name.currency { color: #e0e0e0; }
-#item-name.unidentified { color: #c98a3c; }
+#item-name.unique   { color: var(--rarity-unique); }
+#item-name.rare     { color: var(--rarity-rare); }
+#item-name.currency { color: var(--rarity-currency); }
+
+/* A failed read is a tool message, not an item, so it drops the display face
+   and the rarity colour — it should not look like something that was found. */
+#item-name.unidentified {
+  font-family: var(--font-ui);
+  font-variant: normal;
+  font-size: 13px;
+  letter-spacing: 0;
+  color: var(--warn);
+}
 
 #base-name {
-  font-size: 12px;
-  color: #8888aa;
-  margin-bottom: 8px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-dim);
+  margin-top: 3px;
 }
 
 #price-section {
-  border-top: 1px solid rgba(150, 120, 60, 0.3);
-  padding-top: 8px;
+  padding: 10px 12px 0;
+}
+
+/* Price row: the number carries the weight, the unit recedes. Tabular figures
+   stop the digits from shifting width between items. */
+#price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
 }
 
 #chaos-price {
-  font-size: 16px;
-  color: #f0d060;
-  font-weight: bold;
-  margin-bottom: 2px;
+  font-size: 25px;
+  line-height: 1.05;
+  font-weight: 600;
+  color: var(--text-bright);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.4px;
 }
 
+#price-unit {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* Sentence case, not the uppercase-plus-letter-spacing micro-label. */
 #price-caption {
-  font-size: 10px;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 3px;
 }
 
-/* Cheapest listing is backed by very little data — worth a second look. */
 #price-caption.low-confidence {
-  color: #c98a3c;
+  color: var(--warn);
 }
 
 #variant-list {
-  margin-bottom: 4px;
+  margin-top: 9px;
+  border-top: 1px solid var(--edge);
+  padding-top: 7px;
 }
 
+/* Label left, value right, so the column of prices reads as a column. */
 .variant-row {
-  font-size: 13px;
-  color: #f0d060;
-  padding: 1px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text);
+  padding: 1.5px 0;
+}
+
+.variant-row .v-label {
+  color: var(--text-dim);
+}
+
+.variant-row .v-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
 }
 
 #listings {
   font-size: 11px;
-  color: #888;
-}
-
-#attribution {
-  font-size: 10px;
-  color: #555;
-  text-align: right;
-  margin-top: 6px;
+  color: var(--text-faint);
+  margin-top: 7px;
 }
 
 #no-price {
-  font-size: 13px;
-  color: #aa6666;
-  margin-top: 4px;
+  padding: 10px 12px 0;
+  font-size: 12.5px;
+  color: var(--error);
+}
+
+#foot {
+  margin-top: 10px;
+  border-top: 1px solid var(--edge);
+  padding: 6px 12px 7px;
+  font-size: 10px;
+  color: var(--text-faint);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+#dismiss-hint {
+  color: var(--text-faint);
+  opacity: 0.75;
 }

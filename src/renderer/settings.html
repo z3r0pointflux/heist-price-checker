@@ -8,11 +8,14 @@
 </head>
 <body>
   <div class="container">
-    <h2>z3r0's Heist Price Checker</h2>
+    <header>
+      <h2>z3r0's Heist Price Checker</h2>
+      <div class="subtitle">Price checks Heist curio displays against poe.ninja</div>
+    </header>
 
     <div class="links">
       <a href="#" id="kofi-link">Support on Ko-Fi</a>
-      <a href="#" id="discord-link">z3r0's Discord - The Singularity</a>
+      <a href="#" id="discord-link">Discord &mdash; The Singularity</a>
     </div>
 
     <div class="field">
@@ -31,7 +34,7 @@
     <div class="field">
       <label for="hotkey">Hotkey</label>
       <input type="text" id="hotkey" placeholder="e.g. Ctrl+Shift+D">
-      <div class="hint">Use Electron accelerator format (Ctrl+Shift+D, Alt+Q, etc.)</div>
+      <div class="hint">Electron accelerator format &mdash; Ctrl+Shift+D, Alt+Q, and so on</div>
     </div>
 
     <div class="field row">
@@ -40,8 +43,9 @@
     </div>
 
     <div class="field">
-      <label for="dismissMs">Dismiss after (ms)</label>
+      <label for="dismissMs">Dismiss after</label>
       <input type="number" id="dismissMs" min="1000" max="30000" step="500">
+      <div class="hint">Milliseconds</div>
     </div>
 
     <div class="actions">

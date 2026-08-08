@@ -7,16 +7,24 @@
 </head>
 <body>
   <div id="overlay" onclick="window.heistAPI.dismissOverlay()">
-    <div id="item-name"></div>
-    <div id="base-name"></div>
+    <div id="head">
+      <div id="item-name"></div>
+      <div id="base-name"></div>
+    </div>
     <div id="price-section">
-      <div id="chaos-price"></div>
+      <div id="price-row">
+        <span id="chaos-price"></span>
+        <span id="price-unit">chaos</span>
+      </div>
       <div id="price-caption"></div>
       <div id="variant-list"></div>
       <div id="listings"></div>
     </div>
-    <div id="attribution">poe.ninja</div>
     <div id="no-price" style="display:none;">No pricing data found</div>
+    <div id="foot">
+      <span id="attribution">poe.ninja</span>
+      <span id="dismiss-hint">click to dismiss</span>
+    </div>
   </div>
   <script src="overlay.js"></script>
 </body>

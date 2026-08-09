@@ -33,9 +33,26 @@ const REGION_HEIGHT = 420;
  * Rares are bordered in gold (~160,120,40) and uniques in a dimmer rust
  * (~136,80,40 fading to ~88,40,24), so the test spans both rather than keying on
  * brightness.
+ *
+ * Normal-rarity items — scarabs, and any other white-named stackable — are
+ * bordered in a plain light NEUTRAL instead: an "Influencing Scarab of
+ * Interference" capture measured its rules at (121,113,111) and (137,127,125),
+ * zero warmth. Requiring warmth left that tooltip with a peak coverage of 0.279
+ * against the 0.4 bar, so no box was found at all and the name fell through to
+ * the whole-region pass, which could not read it against a bright background.
+ *
+ * The neutral test has to stay narrow, since grey is everywhere in a Heist
+ * scene: it sits above the name box fill (measured 54,54,54) and below the
+ * near-white of glyph strokes and stat text, and demands near-zero saturation.
+ * What actually rejects scenery is the run-length bar in findNameBox — a rule
+ * has to cross 40% of the region unbroken, which stone and metal do not.
  */
 function isBorderPixel(r: number, g: number, b: number): boolean {
-  return r >= 80 && g >= 30 && g <= 180 && b <= 125 && r > b * 1.5 && r > g * 1.02;
+  const warm = r >= 80 && g >= 30 && g <= 180 && b <= 125 && r > b * 1.5 && r > g * 1.02;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const neutral = min >= 95 && max <= 200 && max - min <= 22;
+  return warm || neutral;
 }
 
 /**

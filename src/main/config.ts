@@ -7,6 +7,7 @@ export interface AppConfig {
   league: string;
   overlayDismissMs: number;
   autoDismiss: boolean;
+  showStartupToast: boolean;
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -14,6 +15,7 @@ const DEFAULT_CONFIG: AppConfig = {
   league: 'Standard',
   overlayDismissMs: 5000,
   autoDismiss: true,
+  showStartupToast: true,
 };
 
 let currentConfig: AppConfig = { ...DEFAULT_CONFIG };

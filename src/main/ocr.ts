@@ -57,6 +57,9 @@ export interface OcrResult {
  * the light grey stat lines and skips the name entirely. Keying on hue instead
  * recovers the name and drops every stat line at the same time.
  */
+const max3 = (r: number, g: number, b: number) => Math.max(r, Math.max(g, b));
+const min3 = (r: number, g: number, b: number) => Math.min(r, Math.min(g, b));
+
 async function maskRarityColours(processed: Buffer, nameBoxOnly = false): Promise<Buffer> {
   const { data, info } = await sharp(processed).raw().toBuffer({ resolveWithObject: true });
   const { width, height, channels } = info;
@@ -100,6 +103,16 @@ async function maskRarityColours(processed: Buffer, nameBoxOnly = false): Promis
         // The warmth floor (r - b) is what separates tan text from the neutral
         // grey of stat lines and the near-white of stack-size numerals.
         if (r > 140 && g > 125 && b > 90 && r >= g && g >= b && r - b > 15 && r - b < 110) {
+          hit[y * width + x] = 1;
+        }
+        // Normal rarity has no colour at all. A scarab's name measured a flat
+        // (192,192,192) — zero warmth — so the tan test above misses it by
+        // construction and the name pass came back empty on a box that was
+        // perfectly legible. Keeping neutral pixels is only safe because this
+        // whole branch is confined to the name box, which holds the name and
+        // nothing else; over the full region it would keep every stat line,
+        // which is the failure the colour mask exists to prevent.
+        else if (max3(r, g, b) - min3(r, g, b) <= 24 && min3(r, g, b) >= 100) {
           hit[y * width + x] = 1;
         }
       }

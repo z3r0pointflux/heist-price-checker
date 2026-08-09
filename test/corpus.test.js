@@ -70,6 +70,11 @@ const TRUTH = {
   '02-30-11': 'Kalguuran Scarab of Enriching',
   '02-33-22': 'Trarthan Scarab of Renown',
   '02-33-28': 'Trarthan Scarab of Renown',
+  // 2026-08-08. A normal-rarity name over a bright background: rules and glyphs
+  // are both flat neutral grey here, where every earlier capture had a warm
+  // rule. No name box was found, and the whole-region pass cannot read light
+  // grey text off the lit curio shelf, so the name never reached the matcher.
+  '02-26-44': 'Influencing Scarab of Interference',
 };
 
 // Identifying an item is not the same as pricing it: the scarab bug produced a
@@ -77,7 +82,7 @@ const TRUTH = {
 // number, so a regression in the fetch layer fails here rather than in play.
 const MUST_PRICE = new Set([
   '03-12-18', '03-12-26', '02-30-05', '02-30-11', '02-33-22', '02-33-28',
-  '19-28-30', '19-28-36',
+  '19-28-30', '19-28-36', '02-26-44',
 ]);
 
 (async () => {

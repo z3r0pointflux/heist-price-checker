@@ -55,6 +55,21 @@ const CASES = [
   ['short base name must survive cleanup',
    ['WAR AXE'], ['WAR AXE', 'ONE HANDED AXE'], 'War Axe', 'rare'],
 
+  // Real capture, 2026-08-08. Scored 0.437 against its own name because the
+  // trailing crumb could only be cut by also cutting the leading "ORB OF".
+  ['currency "Orb of X" with a trailing crumb',
+   [],
+   ['OI Soe MAT', 'jr IR LA', 'EGIRODIAE 5 IS WL', 'TB OSs', 'ORB OF ANNULMENT  gif',
+    'BE LN EY', 'a oh Ee', 'i 2 MAGIC OR RARE ITEM TO APPLY IT'],
+   'Orb of Annulment', 'currency'],
+
+  // The same shape without a crumb, and with a leading one instead — the whole
+  // "Orb of ..." family lives or dies on the leading tokens surviving.
+  ['currency "Orb of X" with a leading crumb',
+   [],
+   ['j ORB OF SCOURING', 'RIGHT CLICK THIS ITEM'],
+   'Orb of Scouring', 'currency'],
+
   ['rare brigandine (was Stiletto)',
    ['KX TRIETT', 'Fo HYPNOTIC SANCTUARY', 'HUSSAR BRIGANDINE EN', 'iw Nn'],
    ['KX TRIETT', 'Fo HYPNOTIC SANCTUARY', 'HUSSAR BRIGANDINE EN', 'iw Nn',

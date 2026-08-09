@@ -4,6 +4,7 @@ const leagueCustomInput = document.getElementById('leagueCustom') as HTMLInputEl
 const useCustomBtn = document.getElementById('useCustomBtn') as HTMLButtonElement;
 const leagueStatus = document.getElementById('leagueStatus')!;
 const autoDismissInput = document.getElementById('autoDismiss') as HTMLInputElement;
+const showStartupToastInput = document.getElementById('showStartupToast') as HTMLInputElement;
 const dismissMsInput = document.getElementById('dismissMs') as HTMLInputElement;
 const saveBtn = document.getElementById('saveBtn') as HTMLButtonElement;
 const statusEl = document.getElementById('status')!;
@@ -12,6 +13,8 @@ async function loadSettings() {
   const config = await window.heistAPI.getConfig();
   hotkeyInput.value = config.hotkey;
   autoDismissInput.checked = config.autoDismiss;
+  // A config written by an older version has no such key, and it defaults on.
+  showStartupToastInput.checked = config.showStartupToast !== false;
   dismissMsInput.value = String(config.overlayDismissMs);
 
   // Try to fetch current leagues and populate dropdown
@@ -57,6 +60,7 @@ saveBtn.addEventListener('click', async () => {
     hotkey: hotkeyInput.value.trim(),
     league: leagueSelect.value,
     autoDismiss: autoDismissInput.checked,
+    showStartupToast: showStartupToastInput.checked,
     overlayDismissMs: parseInt(dismissMsInput.value, 10) || 5000,
   };
 

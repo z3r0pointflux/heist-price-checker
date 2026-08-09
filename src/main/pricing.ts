@@ -128,7 +128,11 @@ const EXCHANGE_OVERVIEW_TYPES = [
 
 let allItems: PriceResult[] = [];
 let lastFetchTime = 0;
-const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+// Doubles as the background refresh interval and the staleness cutoff that
+// ensureFreshCache() checks before a price lookup, so a price can be at most
+// this old. poe.ninja serves rotating snapshots rather than live data, so
+// fetching more often mostly re-downloads the same numbers.
+const CACHE_DURATION_MS = 60 * 60 * 1000; // 1 hour
 
 export type PriceDataStatus =
   | { state: 'ok'; league: string; itemCount: number }

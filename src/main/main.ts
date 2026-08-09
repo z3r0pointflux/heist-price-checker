@@ -30,7 +30,9 @@ import {
 let tray: Tray | null = null;
 let overlayWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
+let toastWindow: BrowserWindow | null = null;
 let isProcessing = false;
+let hotkeyRegistered = true;
 
 // The renderer only starts listening once its script has run. Sending before
 // that drops the payload silently and leaves the overlay showing nothing, so
@@ -40,6 +42,15 @@ let pendingOverlayData: any = null;
 // A single shared dismiss timer: stacking one per check meant an earlier timer
 // could hide a newer overlay seconds after it appeared.
 let dismissTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Startup toast state. It mirrors the overlay's ready/pending handshake, plus a
+// size handshake: the window is only shown once the renderer has reported how
+// big the panel actually is (see showStartupToast).
+let toastReady = false;
+let pendingToastData: any = null;
+let toastShown = false;
+let toastTimer: ReturnType<typeof setTimeout> | null = null;
+let toastHideTimer: ReturnType<typeof setTimeout> | null = null;
 
 // --- File logging ---
 const logPath = path.join(
@@ -116,8 +127,8 @@ function createSettingsWindow(): void {
     width: 450,
     // Tall enough for the whole form: at 500 the last field and the Save button
     // pushed past the bottom and the window grew a scrollbar it cannot scroll
-    // usefully, since it is not resizable.
-    height: 566,
+    // usefully, since it is not resizable. Each added row costs ~38px.
+    height: 604,
     resizable: false,
     minimizable: false,
     maximizable: false,
@@ -136,6 +147,138 @@ function createSettingsWindow(): void {
   settingsWindow.on('closed', () => {
     settingsWindow = null;
   });
+}
+
+// --- Startup toast -------------------------------------------------------
+//
+// A tray icon appearing is easy to miss, so the app looked identical whether it
+// had started cleanly, failed to claim its hotkey, or come up with no prices at
+// all. This says so once, in the corner, and gets out of the way.
+
+// Gap from the work-area corner. The panel's own drop-shadow padding sits inside
+// the window on top of this.
+const TOAST_MARGIN = 8;
+// How long the toast stays once its status is final.
+const TOAST_LINGER_MS = 4500;
+// Hard cap while the status is still pending, so a hung fetch cannot leave a
+// "Loading prices…" box on screen for the rest of the session.
+const TOAST_MAX_MS = 12000;
+// Long enough for the renderer's fade-out to finish before the window vanishes.
+const TOAST_FADE_MS = 240;
+
+function createToastWindow(): BrowserWindow {
+  const win = new BrowserWindow({
+    // A placeholder size: the renderer measures the panel and main trims the
+    // window to it before showing anything.
+    width: 380,
+    height: 160,
+    show: false,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    skipTaskbar: true,
+    // Deliberately resizable: setBounds is unreliable on a window locked to
+    // resizable:false, and nothing can grab this one — it is frameless and
+    // ignores the mouse entirely.
+    resizable: true,
+    movable: false,
+    focusable: false,
+    icon: getIconPath(),
+    webPreferences: {
+      preload: getPreloadPath(),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  // Never eat a click. This lands in the bottom-right corner, which in Path of
+  // Exile is the skill bar — a notification that swallowed a flask press would
+  // be worse than no notification.
+  win.setIgnoreMouseEvents(true, { forward: true });
+  win.loadFile(path.join(__dirname, '..', 'renderer', 'toast.html'));
+
+  return win;
+}
+
+// The tray label and this one say the same thing to different audiences: the
+// tray is a reference you go looking for, this is a one-shot reassurance, so it
+// leads with the outcome rather than the count.
+function toastPriceStatus(): { text: string; tone: string } {
+  const status = getPriceDataStatus();
+  switch (status.state) {
+    case 'ok':
+      return { text: `${status.itemCount.toLocaleString()} prices loaded · ${status.league}`, tone: 'ok' };
+    case 'empty':
+      return { text: `No price data for ${status.league}`, tone: 'warn' };
+    case 'league-retired':
+      return status.switchedTo
+        ? { text: `"${status.league}" has ended — now using ${status.switchedTo}`, tone: 'warn' }
+        : { text: `"${status.league}" has ended — pick a league in Settings`, tone: 'warn' };
+    case 'league-unknown':
+      return { text: `poe.ninja has no data for "${status.league}"`, tone: 'warn' };
+    case 'network-error':
+      return { text: 'Could not reach poe.ninja — prices unavailable', tone: 'error' };
+    case 'never-fetched':
+      return { text: 'Loading prices…', tone: 'pending' };
+  }
+}
+
+function sendToast(data: any): void {
+  pendingToastData = data;
+  if (toastReady && toastWindow && !toastWindow.isDestroyed()) {
+    toastWindow.webContents.send('toast-update', data);
+  }
+}
+
+function showStartupToast(): void {
+  const config = getConfig();
+  if (!config.showStartupToast) return;
+
+  toastReady = false;
+  toastShown = false;
+  toastWindow = createToastWindow();
+
+  sendToast({
+    hotkey: config.hotkey,
+    hotkeyOk: hotkeyRegistered,
+    status: toastPriceStatus(),
+  });
+
+  // Prices are still loading at this point, so the toast waits for them — but
+  // only up to the cap, in case the fetch never resolves.
+  toastTimer = setTimeout(hideToast, TOAST_MAX_MS);
+}
+
+// Called once the startup price fetch settles. A toast that has already gone is
+// left alone: popping it back up seconds later would read as a new event.
+function updateStartupToast(): void {
+  if (!toastWindow || toastWindow.isDestroyed() || toastHideTimer) return;
+
+  sendToast({
+    hotkey: getConfig().hotkey,
+    hotkeyOk: hotkeyRegistered,
+    status: toastPriceStatus(),
+  });
+
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, TOAST_LINGER_MS);
+}
+
+function hideToast(): void {
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  }
+  if (!toastWindow || toastWindow.isDestroyed() || toastHideTimer) return;
+
+  if (toastReady) toastWindow.webContents.send('toast-dismiss');
+  toastHideTimer = setTimeout(() => {
+    toastHideTimer = null;
+    if (toastWindow && !toastWindow.isDestroyed()) toastWindow.destroy();
+    toastWindow = null;
+    toastReady = false;
+    pendingToastData = null;
+  }, TOAST_FADE_MS);
 }
 
 // A tray context menu is drawn by Windows, so it takes no styling from the app.
@@ -215,6 +358,7 @@ function registerHotkey(): void {
     handleHotkeyPress();
   });
 
+  hotkeyRegistered = registered;
   if (!registered) {
     logError(`Failed to register hotkey: ${config.hotkey}`);
   } else {
@@ -415,6 +559,37 @@ ipcMain.on('overlay-ready', () => {
   }
 });
 
+ipcMain.on('toast-ready', () => {
+  toastReady = true;
+  if (pendingToastData && toastWindow && !toastWindow.isDestroyed()) {
+    toastWindow.webContents.send('toast-update', pendingToastData);
+  }
+});
+
+// The renderer reports the panel's laid-out size; the window is trimmed to it
+// and only then shown, so the panel is never seen sitting away from the corner.
+ipcMain.on('toast-size', (_event, size: { width: number; height: number }) => {
+  if (!toastWindow || toastWindow.isDestroyed()) return;
+
+  const width = Math.max(1, Math.round(size.width));
+  const height = Math.max(1, Math.round(size.height));
+  const area = screen.getPrimaryDisplay().workArea;
+
+  toastWindow.setBounds({
+    x: Math.round(area.x + area.width - width - TOAST_MARGIN),
+    y: Math.round(area.y + area.height - height - TOAST_MARGIN),
+    width,
+    height,
+  });
+
+  if (!toastShown) {
+    toastShown = true;
+    toastWindow.setAlwaysOnTop(true, 'screen-saver');
+    toastWindow.showInactive();
+    log(`Startup toast shown (${width}x${height})`);
+  }
+});
+
 ipcMain.on('dismiss-overlay', () => {
   if (overlayWindow && !overlayWindow.isDestroyed()) {
     overlayWindow.hide();
@@ -488,6 +663,10 @@ app.whenReady().then(async () => {
   // Pre-create overlay window
   overlayWindow = createOverlayWindow();
 
+  // Say the app is up before anything slow starts, so the confirmation is not
+  // waiting on the price fetch. It updates in place when prices land.
+  showStartupToast();
+
   // Initialize OCR engine in background
   log('Initializing OCR...');
   initOCR().then(() => log('OCR ready'));
@@ -498,10 +677,12 @@ app.whenReady().then(async () => {
     .then(() => {
       log('Price data ready');
       refreshTrayMenu();
+      updateStartupToast();
     })
     .catch(err => {
       logError('Price data fetch failed:', err);
       refreshTrayMenu();
+      updateStartupToast();
     });
 
   startPeriodicRefresh();

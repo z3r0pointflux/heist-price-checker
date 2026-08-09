@@ -49,22 +49,45 @@ function candidateForms(line: string): string[] {
   const tokens = line.split(/\s+/).filter(Boolean);
   const forms = new Set<string>([line]);
 
+  // Where the leading crumbs end.
   let start = 0;
   while (start < tokens.length - 1 && tokens[start].length <= 3) start++;
+
+  // Where the trailing crumbs begin. Three-letter tokens count, for the crumbs
+  // the lock icons at the ends of a name box leave ("… ENRICHING Gib",
+  // "… ANNULMENT gif").
   let end = tokens.length;
-  while (end > start + 1 && tokens[end - 1].length <= 2) end--;
-  if (start > 0 || end < tokens.length) forms.add(tokens.slice(start, end).join(' '));
+  while (end > 1 && tokens[end - 1].length <= 3) end--;
 
-  // A more aggressive trailing trim, for the three-character crumbs the lock
-  // icons at the ends of a name box leave behind ("… ENRICHING Gib", "… Puc").
-  // Those cost enough score to push an otherwise exact name past threshold.
-  // This is added as an extra form rather than replacing the others: every form
-  // is scored and the best wins, so a real three-letter word like the "Orb" in
-  // "Tailoring Orb" is still matched by the untrimmed variant.
-  let hardEnd = tokens.length;
-  while (hardEnd > start + 1 && tokens[hardEnd - 1].length <= 3) hardEnd--;
-  if (hardEnd < tokens.length) forms.add(tokens.slice(start, hardEnd).join(' '));
+  // Both ends are trimmed INDEPENDENTLY, and at every cut in between rather than
+  // only at the maximum. Two separate faults showed up in one currency name:
+  //
+  //   "ORB OF ANNULMENT  gif" — cutting the trailing "gif" also cut the leading
+  //     "ORB OF", since both are three letters or fewer, leaving a bare
+  //     "ANNULMENT" that the length guard rejected against "Orb of Annulment"
+  //     (0.64 against the 0.65 floor). The exact form was never generated.
+  //   "j ORB OF SCOURING" — the leading cut takes every short token it can, so
+  //     it ran past the crumb and through "ORB OF" as well. Only the untrimmed
+  //     line was left to match on, at 0.291 — inside the 0.3 cutoff by a hair.
+  //
+  // Every "Orb of ..." currency has that shape, so neither was one item's
+  // problem. Cuts are capped at three tokens per end: real crumbs are one or two
+  // tokens, and an uncapped sweep over a line of scenery noise would fan out to
+  // dozens of forms, each costing a fuzzy search against every index.
+  const MAX_CUT = 3;
+  const startCuts = new Set<number>([0, start]);
+  for (let i = 1; i <= MAX_CUT && i <= start; i++) startCuts.add(i);
+  const endCuts = new Set<number>([tokens.length, end]);
+  for (let i = 1; i <= MAX_CUT && tokens.length - i >= end; i++) endCuts.add(tokens.length - i);
 
+  for (const from of startCuts) {
+    for (const to of endCuts) {
+      if (to > from) forms.add(tokens.slice(from, to).join(' '));
+    }
+  }
+
+  // Every form is scored and the best wins, so widening this set can only help a
+  // correct name; the length guard and score thresholds still reject the rest.
   return [...forms].filter(f => f.replace(/[^A-Za-z]/g, '').length >= 4);
 }
 

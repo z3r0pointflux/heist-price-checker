@@ -1,12 +1,12 @@
 {
   "name": "z3r0s-heist-price-checker",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "z3r0's Heist Price Checker - Path of Exile Heist curio display price checker using poe.ninja",
   "productName": "z3r0's Heist Price Checker",
   "main": "dist/main/main.js",
   "scripts": {
-    "start": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css','theme.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron .",
-    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css','theme.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron-builder",
+    "start": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css','toast.html','toast.css','theme.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron .",
+    "build": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css','toast.html','toast.css','theme.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron-builder",
     "compile": "tsc",
     "test": "tsc && node test/pricing.test.js && node test/lowest-price.test.js && node test/detection.test.js && node test/corpus.test.js"
   },

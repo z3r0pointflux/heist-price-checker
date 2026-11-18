@@ -38,12 +38,13 @@ const check = (c, m) => { if (!c) failures++; ok(c, m); };
   console.log('  status:', JSON.stringify(st1));
   console.log('  config league is now:', config.getConfig().league);
   check(st1.state === 'league-retired', 'retired league is detected');
-  check(st1.switchedTo === 'Allflame', 'auto-switched to current league (Allflame)');
-  check(config.getConfig().league === 'Allflame', 'config was persisted with new league');
+  const availableLeagues = await pricing.fetchAvailableLeagues();
+  check(availableLeagues.includes(st1.switchedTo), 'auto-switched to an active league');
+  check(config.getConfig().league === st1.switchedTo, 'config was persisted with new league');
   check(pricing.hasPriceData(), 'prices were still loaded after the switch');
 
   // --- 2. Normal operation on the current league ---
-  console.log('\n=== Case 2: current league (Allflame) ===');
+  console.log(`\n=== Case 2: current league (${config.getConfig().league}) ===`);
   await pricing.fetchPriceData();
   const st2 = pricing.getPriceDataStatus();
   console.log('  status:', JSON.stringify(st2));

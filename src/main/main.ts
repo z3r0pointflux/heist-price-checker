@@ -10,7 +10,7 @@ import {
 import * as path from 'path';
 import * as fs from 'fs';
 import { loadConfig, saveConfig, getConfig, AppConfig } from './config';
-import { takeScreenshot } from './screenshot';
+import { captureToScreenPoint, takeScreenshot } from './screenshot';
 import { detectHighlight } from './highlight';
 import { initOCR, recognizeText, shutdownOCR } from './ocr';
 import { classifyItem } from './itemDetect';
@@ -376,11 +376,12 @@ async function handleHotkeyPress(): Promise<void> {
     log(`Hotkey pressed, cursor at (${cursorPos.x}, ${cursorPos.y})`);
 
     // 2. Take screenshot
-    const screenshotBuf = await takeScreenshot();
-    log(`Screenshot captured (${screenshotBuf.length} bytes)`);
+    const capture = await takeScreenshot(cursorPos);
+    const screenshotBuf = capture.buffer;
+    log(`Screenshot captured (${screenshotBuf.length} bytes), display ${JSON.stringify(capture.bounds)}, image cursor ${JSON.stringify(capture.cursor)}`);
 
     // 3. Detect highlight region
-    const highlight = await detectHighlight(screenshotBuf, cursorPos);
+    const highlight = await detectHighlight(screenshotBuf, capture.cursor);
     if (!highlight) {
       log('No highlight region detected');
       showOverlayWithError('No highlighted item detected');
@@ -455,12 +456,12 @@ async function handleHotkeyPress(): Promise<void> {
           listings: e.listingCount,
         })),
       } : null,
-      position: {
+      position: captureToScreenPoint(capture, {
         // Anchor beside the name box when we found one — that is the tooltip's
         // real position, rather than wherever the search window happened to sit.
         x: (nameBox ?? region).x + (nameBox ?? region).width + 10,
         y: (nameBox ?? region).y,
-      },
+      }),
     });
   } catch (err) {
     logError('Error during price check:', err);

@@ -8,7 +8,7 @@
     "start": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css','toast.html','toast.css','theme.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron .",
     "build": "tsc && node -e \"const fs=require('fs');const path=require('path');['overlay.html','overlay.css','settings.html','settings.css','toast.html','toast.css','theme.css'].forEach(f=>fs.copyFileSync(path.join('src','renderer',f),path.join('dist','renderer',f)))\" && electron-builder",
     "compile": "tsc",
-    "test": "tsc && node test/pricing.test.js && node test/lowest-price.test.js && node test/detection.test.js && node test/corpus.test.js"
+    "test": "tsc && node test/screenshot.test.js && node test/pricing.test.js && node test/lowest-price.test.js && node test/detection.test.js && node test/corpus.test.js"
   },
   "author": "",
   "license": "MIT",

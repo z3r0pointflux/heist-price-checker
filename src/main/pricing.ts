@@ -45,10 +45,8 @@ interface NinjaItem {
   links?: number;
 }
 
-// poe.ninja retired the legacy /api/data/{item,currency}overview endpoints — they
-// now return 404 for every league. The site is namespaced per game and every
-// economy request is keyed to a rotating snapshot version that has to be read
-// from index-state first.
+// The league index lists which economies are available, and the current
+// economy endpoints serve the latest prices for each league.
 const NINJA_BASE = 'https://poe.ninja/poe1/api';
 const NINJA_HEADERS = { 'User-Agent': 'HeistChecker/1.2' };
 
@@ -76,7 +74,6 @@ interface NinjaLeague {
 interface IndexState {
   economyLeagues: NinjaLeague[];
   oldEconomyLeagues: NinjaLeague[];
-  snapshotVersions: { url: string; type: string; name: string; version: string }[];
 }
 
 const ITEM_OVERVIEW_TYPES = [
@@ -100,8 +97,7 @@ const CURRENCY_OVERVIEW_TYPES = [
  * bare 404 for every one of them, and `currency/overview` answers 200 with an
  * empty `lines` array for *any* type string — including nonsense — so neither
  * status code nor payload gave a hint that the request was misdirected. They
- * live under a separate path with the literal segment `current` where the stash
- * endpoints take a rotating snapshot version.
+ * live under a separate exchange path.
  *
  * Scarabs were the reported bug, but the same gap silently swallowed essences,
  * fossils, oils, divination cards, delirium orbs, omens, artifacts, resonators,
@@ -166,38 +162,19 @@ export async function fetchAvailableLeagues(): Promise<string[]> {
   return (index.economyLeagues ?? []).map(l => l.name);
 }
 
-interface ResolvedLeague {
-  name: string;
-  version: string;
-}
-
 /**
  * Map the configured league onto a league poe.ninja actually serves.
  *
- * The API matches on the league's display name ("Allflame"), not its url slug —
- * passing the slug returns HTTP 200 with an empty `lines` array, so a wrong name
- * looks like "no items priced" rather than an error. Matching is done
- * case-insensitively against both forms to absorb that.
+ * Accept either the league name or URL slug in config. Price requests use
+ * the canonical league name returned by the index.
  */
-function resolveLeague(index: IndexState, configured: string): ResolvedLeague | null {
+function resolveLeague(index: IndexState, configured: string): NinjaLeague | undefined {
   const wanted = configured.trim().toLowerCase();
   const current = index.economyLeagues ?? [];
 
-  const league = current.find(
+  return current.find(
     l => l.name.toLowerCase() === wanted || l.url.toLowerCase() === wanted,
   );
-  if (!league) return null;
-
-  // Snapshot versions are per-league-slug; 'exp' is the standard economy snapshot.
-  // Some leagues (e.g. Hardcore) have no entry of their own — any current
-  // snapshot works as the cache key, so fall back to the newest one we have.
-  const versions = index.snapshotVersions ?? [];
-  const own = versions.find(v => v.url === league.url && v.type === 'exp');
-  const fallback = versions.find(v => v.type === 'exp');
-  const version = own?.version ?? fallback?.version;
-  if (!version) return null;
-
-  return { name: league.name, version };
 }
 
 function isRetiredLeague(index: IndexState, configured: string): boolean {
@@ -237,7 +214,7 @@ export async function fetchPriceData(): Promise<void> {
           `switching to "${currentLeague.name}"`,
       );
       saveConfig({ ...getConfig(), league: currentLeague.name });
-      resolved = resolveLeague(index, currentLeague.name);
+      resolved = currentLeague;
       migration = retired
         ? { state: 'league-retired', league: configured, switchedTo: currentLeague.name }
         : { state: 'league-unknown', league: configured };
@@ -252,17 +229,17 @@ export async function fetchPriceData(): Promise<void> {
     }
   }
 
-  const { name: league, version } = resolved;
+  const league = resolved.name;
   const items: PriceResult[] = [];
   let failures = 0;
 
-  console.log(`[pricing] Fetching poe.ninja data for league: ${league} (snapshot ${version})`);
+  console.log(`[pricing] Fetching poe.ninja data for league: ${league}`);
 
   // Fetch item overviews
   for (const type of ITEM_OVERVIEW_TYPES) {
     try {
       const url =
-        `${NINJA_BASE}/economy/stash/${encodeURIComponent(version)}/item/overview` +
+        `${NINJA_BASE}/economy/stash/current/item/overview` +
         `?league=${encodeURIComponent(league)}&type=${type}`;
       const response = await fetch(url, { headers: NINJA_HEADERS });
       if (!response.ok) {
@@ -297,7 +274,7 @@ export async function fetchPriceData(): Promise<void> {
   for (const type of CURRENCY_OVERVIEW_TYPES) {
     try {
       const url =
-        `${NINJA_BASE}/economy/stash/${encodeURIComponent(version)}/currency/overview` +
+        `${NINJA_BASE}/economy/stash/current/currency/overview` +
         `?league=${encodeURIComponent(league)}&type=${type}`;
       const response = await fetch(url, { headers: NINJA_HEADERS });
       if (!response.ok) {
